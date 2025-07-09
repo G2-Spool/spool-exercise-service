@@ -2,6 +2,8 @@
 
 Exercise generation, evaluation, and remediation service with LangGraph orchestration for the Spool platform.
 
+**Status:** ✅ Deployed to CodeBuild
+
 ## Overview
 
 The Exercise Service is responsible for:
