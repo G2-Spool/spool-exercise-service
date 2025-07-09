@@ -53,7 +53,7 @@ app = FastAPI(
     title="Spool Exercise Service",
     description="Exercise generation, evaluation, and remediation with LangGraph orchestration",
     version=settings.APP_VERSION,
-    lifespan=lifespan,
+    # lifespan=lifespan,  # Temporarily disabled for testing
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )

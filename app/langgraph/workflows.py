@@ -1,8 +1,8 @@
 """LangGraph workflow definitions."""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint import MemorySaver
+from langgraph.checkpoint.memory import MemorySaver
 import structlog
 
 from app.langgraph.state import ExerciseState

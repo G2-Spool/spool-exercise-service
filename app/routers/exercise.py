@@ -1,9 +1,12 @@
 """Exercise generation routes."""
 
-from typing import List, Optional
+import json
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 import structlog
+
+from app.core.config import settings
 
 from app.models.exercise import (
     ExerciseGenerationRequest,
@@ -180,6 +183,3 @@ async def check_mastery_status(
         raise HTTPException(status_code=500, detail="Failed to check mastery")
 
 
-from app.core.config import settings
-from typing import Dict, Any
-import json
