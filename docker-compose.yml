@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  exercise-service:
+    build: .
+    container_name: spool-exercise-service
+    ports:
+      - "8003:8003"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - CONTENT_SERVICE_URL=http://content-service:8002
+      - PROFILE_SERVICE_URL=http://progress-service:8004
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=development
+    depends_on:
+      - redis
+    networks:
+      - spool-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8003/health').raise_for_status()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: spool-redis-exercise
+    ports:
+      - "6380:6379"  # Different host port to avoid conflicts
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - spool-network
+
+networks:
+  spool-network:
+    external: true
+
+volumes:
+  redis_data:
