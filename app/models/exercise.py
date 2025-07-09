@@ -9,6 +9,7 @@ import uuid
 
 class ExerciseType(str, Enum):
     """Types of exercises."""
+
     INITIAL = "initial"
     ADVANCED = "advanced"
     REMEDIATION = "remediation"
@@ -17,6 +18,7 @@ class ExerciseType(str, Enum):
 
 class DifficultyLevel(str, Enum):
     """Exercise difficulty levels."""
+
     BASIC = "basic"
     INTERMEDIATE = "intermediate"
     ADVANCED = "advanced"
@@ -24,6 +26,7 @@ class DifficultyLevel(str, Enum):
 
 class LifeCategory(str, Enum):
     """Life categories for personalization."""
+
     PERSONAL = "personal"
     CAREER = "career"
     SOCIAL = "social"
@@ -32,6 +35,7 @@ class LifeCategory(str, Enum):
 
 class MasteryStatus(str, Enum):
     """Student mastery status for a concept."""
+
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     MASTERED = "mastered"
@@ -40,6 +44,7 @@ class MasteryStatus(str, Enum):
 
 class Exercise(BaseModel):
     """Exercise model."""
+
     exercise_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     concept_id: str
     student_id: str
@@ -55,6 +60,7 @@ class Exercise(BaseModel):
 
 class ExerciseGenerationRequest(BaseModel):
     """Request to generate an exercise."""
+
     concept_id: str
     student_id: str
     student_interests: List[str]
@@ -65,6 +71,7 @@ class ExerciseGenerationRequest(BaseModel):
 
 class StudentResponse(BaseModel):
     """Student's response to an exercise."""
+
     exercise_id: str
     student_id: str
     response_text: str
@@ -74,6 +81,7 @@ class StudentResponse(BaseModel):
 
 class CompetencyMap(BaseModel):
     """Competency analysis of student response."""
+
     correct_steps: List[str] = Field(default_factory=list)
     missing_steps: List[str] = Field(default_factory=list)
     incorrect_steps: List[str] = Field(default_factory=list)
@@ -82,6 +90,7 @@ class CompetencyMap(BaseModel):
 
 class Evaluation(BaseModel):
     """Evaluation of student response."""
+
     evaluation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     exercise_id: str
     student_id: str
@@ -98,6 +107,7 @@ class Evaluation(BaseModel):
 
 class Remediation(BaseModel):
     """Remediation content for understanding gaps."""
+
     remediation_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     evaluation_id: str
     exercise_id: str
@@ -111,6 +121,7 @@ class Remediation(BaseModel):
 
 class ExerciseHistory(BaseModel):
     """Student's exercise history for a concept."""
+
     student_id: str
     concept_id: str
     exercises: List[Exercise]
@@ -123,12 +134,14 @@ class ExerciseHistory(BaseModel):
 
 class GenerateExerciseResponse(BaseModel):
     """Response from exercise generation."""
+
     exercise: Exercise
     message: str = "Exercise generated successfully"
 
 
 class EvaluateResponse(BaseModel):
     """Response from exercise evaluation."""
+
     evaluation: Evaluation
     next_action: str  # "continue", "remediate", "complete"
     message: str

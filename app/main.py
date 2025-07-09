@@ -1,8 +1,6 @@
 """Main FastAPI application for Exercise Service."""
 
-import os
 from contextlib import asynccontextmanager
-from typing import Dict, Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,21 +24,21 @@ async def lifespan(app: FastAPI):
     """Application lifecycle manager."""
     # Startup
     logger.info("Starting Spool Exercise Service", version=settings.APP_VERSION)
-    
+
     # Initialize services
     redis_cache = await get_redis_cache()
     workflow = ExerciseWorkflow()
-    
+
     # Store in app state
     app.state.redis_cache = redis_cache
     app.state.workflow = workflow
-    
+
     # Prometheus metrics are set up outside of lifespan
-    
+
     logger.info("Exercise service initialized successfully")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Spool Exercise Service")
 
@@ -72,7 +70,9 @@ if settings.ENABLE_METRICS:
 # Include routers
 app.include_router(exercise.router, prefix="/api/exercise", tags=["exercise"])
 app.include_router(evaluation.router, prefix="/api/exercise", tags=["evaluation"])
-app.include_router(remediation.router, prefix="/api/exercise/remediation", tags=["remediation"])
+app.include_router(
+    remediation.router, prefix="/api/exercise/remediation", tags=["remediation"]
+)
 
 
 @app.get("/", tags=["root"])
@@ -82,7 +82,7 @@ async def root():
         "service": "Spool Exercise Service",
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
-        "status": "operational"
+        "status": "operational",
     }
 
 
@@ -93,9 +93,9 @@ async def health_check(request: Request):
         "status": "healthy",
         "service": "exercise-service",
         "version": settings.APP_VERSION,
-        "checks": {}
+        "checks": {},
     }
-    
+
     # Check Redis
     try:
         if hasattr(request.app.state, "redis_cache"):
@@ -104,7 +104,7 @@ async def health_check(request: Request):
     except Exception as e:
         health_status["checks"]["redis"] = f"unhealthy: {str(e)}"
         health_status["status"] = "degraded"
-    
+
     # Check LangGraph workflow
     try:
         if hasattr(request.app.state, "workflow"):
@@ -114,7 +114,7 @@ async def health_check(request: Request):
     except Exception as e:
         health_status["checks"]["langgraph"] = f"unhealthy: {str(e)}"
         health_status["status"] = "degraded"
-    
+
     status_code = 200 if health_status["status"] == "healthy" else 503
     return JSONResponse(content=health_status, status_code=status_code)
 
@@ -124,35 +124,34 @@ async def get_config():
     """Get current configuration (development only)."""
     if settings.ENVIRONMENT == "production":
         return JSONResponse(
-            content={"error": "Not available in production"},
-            status_code=403
+            content={"error": "Not available in production"}, status_code=403
         )
-    
+
     return {
         "environment": settings.ENVIRONMENT,
         "models": {
             "evaluation": settings.EVALUATION_MODEL,
-            "generation": settings.GENERATION_MODEL
+            "generation": settings.GENERATION_MODEL,
         },
         "services": {
             "content": settings.CONTENT_SERVICE_URL,
-            "profile": settings.PROFILE_SERVICE_URL
+            "profile": settings.PROFILE_SERVICE_URL,
         },
         "cache_ttl": settings.EXERCISE_CACHE_TTL,
         "workflow": {
             "max_retries": settings.MAX_RETRIES,
-            "timeout": settings.WORKFLOW_TIMEOUT
-        }
+            "timeout": settings.WORKFLOW_TIMEOUT,
+        },
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
         port=settings.SERVICE_PORT,
         reload=settings.ENVIRONMENT == "development",
-        log_config=None  # Use structlog instead
+        log_config=None,  # Use structlog instead
     )

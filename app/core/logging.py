@@ -10,13 +10,13 @@ from app.core.config import settings
 
 def setup_logging():
     """Configure structured logging."""
-    
+
     # Determine renderer based on environment
     if settings.LOG_FORMAT == "json":
         renderer = JSONRenderer()
     else:
         renderer = structlog.dev.ConsoleRenderer()
-    
+
     # Configure structlog
     structlog.configure(
         processors=[
@@ -34,9 +34,10 @@ def setup_logging():
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
-    
+
     # Set log level
     import logging
+
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
