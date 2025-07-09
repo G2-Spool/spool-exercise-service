@@ -2,10 +2,14 @@
 
 from typing import List, Optional
 from functools import lru_cache
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 import json
+import structlog
+
+logger = structlog.get_logger()
 
 
 class Settings(BaseSettings):
@@ -24,8 +28,8 @@ class Settings(BaseSettings):
     SERVICE_NAME: str = "exercise-service"
     SERVICE_PORT: int = 8003
     
-    # OpenAI
-    OPENAI_API_KEY: str
+    # OpenAI - will be loaded from AWS Parameter Store in production
+    OPENAI_API_KEY: str = Field(default="")
     EVALUATION_MODEL: str = "gpt-4o"
     GENERATION_MODEL: str = "gpt-4o"
     TEMPERATURE: float = 0.7
@@ -84,12 +88,58 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production."""
         return self.ENVIRONMENT == "production"
+    
+    def is_development(self) -> bool:
+        """Check if running in development."""
+        return self.ENVIRONMENT == "development"
+    
+    def load_production_secrets(self):
+        """Load secrets from AWS Parameter Store for production."""
+        if not self.is_production():
+            return
+            
+        try:
+            from app.core.aws_config import get_aws_parameter_store
+            
+            aws_params = get_aws_parameter_store()
+            
+            # Load OpenAI API key from AWS Parameter Store
+            openai_key = aws_params.get_parameter('/spool/openai-api-key')
+            if openai_key:
+                self.OPENAI_API_KEY = openai_key
+                logger.info("Loaded OpenAI API key from AWS Parameter Store")
+            else:
+                logger.error("Failed to load OpenAI API key from AWS Parameter Store")
+                
+        except Exception as e:
+            logger.error("Failed to load production secrets", error=str(e))
+            raise
+    
+    def validate_configuration(self):
+        """Validate configuration based on environment."""
+        if self.is_production():
+            if not self.OPENAI_API_KEY or self.OPENAI_API_KEY.startswith("test"):
+                raise ValueError("Production environment requires valid OpenAI API key")
+        
+        if self.is_development():
+            # Allow test keys in development
+            if not self.OPENAI_API_KEY:
+                logger.warning("No OpenAI API key configured for development")
 
 
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance."""
-    return Settings()
+    settings = Settings()
+    
+    # Load production secrets if in production
+    if settings.is_production():
+        settings.load_production_secrets()
+    
+    # Validate configuration
+    settings.validate_configuration()
+    
+    return settings
 
 
 # Global settings instance

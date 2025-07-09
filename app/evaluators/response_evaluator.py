@@ -31,8 +31,11 @@ class ResponseEvaluator:
             if len(student_response) < settings.MIN_RESPONSE_LENGTH:
                 return self._create_insufficient_response_evaluation(exercise, student_response)
             
-            # Check if using test key - create mock evaluation
-            if settings.OPENAI_API_KEY == "test_key" or settings.OPENAI_API_KEY.startswith("test"):
+            # Check if using test key or no key - create mock evaluation
+            if (not settings.OPENAI_API_KEY or 
+                settings.OPENAI_API_KEY == "test_key" or 
+                settings.OPENAI_API_KEY.startswith("test") or
+                settings.OPENAI_API_KEY == "your-openai-api-key"):
                 return self._create_mock_evaluation(exercise, student_response, concept)
             
             prompt = self._create_evaluation_prompt(exercise, student_response, concept)

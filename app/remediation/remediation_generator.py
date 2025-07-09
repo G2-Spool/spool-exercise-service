@@ -29,8 +29,11 @@ class RemediationGenerator:
     ) -> Dict[str, Any]:
         """Generate remediation content for a specific gap."""
         try:
-            # Check if using test key - create mock remediation
-            if settings.OPENAI_API_KEY == "test_key" or settings.OPENAI_API_KEY.startswith("test"):
+            # Check if using test key or no key - create mock remediation
+            if (not settings.OPENAI_API_KEY or 
+                settings.OPENAI_API_KEY == "test_key" or 
+                settings.OPENAI_API_KEY.startswith("test") or
+                settings.OPENAI_API_KEY == "your-openai-api-key"):
                 return self._create_mock_remediation(concept, target_gap, student_profile, original_exercise, evaluation)
             
             prompt = self._create_remediation_prompt(
