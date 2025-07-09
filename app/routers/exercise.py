@@ -73,7 +73,9 @@ async def generate_exercise(
         raise
     except Exception as e:
         logger.error("Exercise generation failed", error=str(e))
-        raise HTTPException(status_code=500, detail="Exercise generation failed")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Exercise generation failed: {str(e)}")
 
 
 @router.post("/generate-advanced", response_model=GenerateExerciseResponse)

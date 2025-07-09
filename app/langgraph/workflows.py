@@ -148,11 +148,21 @@ class ExerciseWorkflow:
         concept_data: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Run evaluation workflow."""
+        # Reconstruct student profile from exercise data
+        student_profile = {
+            "student_id": exercise_data.get("student_id"),
+            "interests": exercise_data.get("personalization", {}).get("interests_used", []),
+            "learning_style": "visual",
+            "grade_level": "high_school",
+            "previous_concepts": []
+        }
+        
         initial_state = {
             "exercise_id": exercise_id,
             "student_response": student_response,
             "exercise": exercise_data,
             "concept_data": concept_data,
+            "student_profile": student_profile,
             "workflow_status": "evaluating"
         }
         

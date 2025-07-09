@@ -35,10 +35,7 @@ async def lifespan(app: FastAPI):
     app.state.redis_cache = redis_cache
     app.state.workflow = workflow
     
-    # Setup Prometheus metrics
-    if settings.ENABLE_METRICS:
-        instrumentator = Instrumentator()
-        instrumentator.instrument(app).expose(app, endpoint="/metrics")
+    # Prometheus metrics are set up outside of lifespan
     
     logger.info("Exercise service initialized successfully")
     
@@ -53,7 +50,7 @@ app = FastAPI(
     title="Spool Exercise Service",
     description="Exercise generation, evaluation, and remediation with LangGraph orchestration",
     version=settings.APP_VERSION,
-    # lifespan=lifespan,  # Temporarily disabled for testing
+    lifespan=lifespan,
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )
@@ -66,6 +63,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Setup Prometheus metrics (must be done before including routers)
+if settings.ENABLE_METRICS:
+    instrumentator = Instrumentator()
+    instrumentator.instrument(app).expose(app, endpoint="/metrics")
 
 # Include routers
 app.include_router(exercise.router, prefix="/api/exercise", tags=["exercise"])
