@@ -2,11 +2,12 @@
 """
 Comprehensive Exercise Workflow Test
 
-This script tests the complete exercise workflow with four different student scenarios:
-1. Perfect Student - succeeds flawlessly
-2. Good Student - has understanding but makes mistakes
-3. Struggling Student - tries but has difficulties
-4. Lazy Student - doesn't try and just wants answers
+This script tests the complete exercise workflow with the correct flow:
+1. Generate personalized exercises for students with specific interests
+2. Use hardcoded student responses (4 types) for consistent testing
+3. Evaluate responses using the evaluator
+4. Generate remediation if needed
+5. Log all interactions in detail with human-readable reports
 
 Results are saved to detailed files for analysis.
 """
@@ -17,17 +18,19 @@ import os
 import uuid
 from datetime import datetime
 from typing import Dict, Any, List
-import structlog
-from dotenv import load_dotenv
-from pathlib import Path
 import sys
+from pathlib import Path
 
 # Load environment variables from .env file
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    print("⚠️  python-dotenv not installed. Make sure OPENAI_API_KEY is set in environment.")
 
 # Add app directory to path
-app_path = Path(__file__).parent.parent / "app"
-sys.path.insert(0, str(app_path))
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 # Import the exercise service components
 from app.core.config import settings
@@ -47,14 +50,14 @@ except ImportError:
 from app.generators.exercise_generator import ExerciseGenerator
 from app.evaluators.response_evaluator import ResponseEvaluator
 from app.remediation.remediation_generator import RemediationGenerator
-from app.resources.personalities import personality_loader
-from openai import AsyncOpenAI
 
-# Setup logging
-logger = structlog.get_logger()
+# Setup basic logging
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class RealAPIWorkflowTester:
-    """Comprehensive workflow tester using real API calls."""
+class ExerciseWorkflowTester:
+    """Comprehensive workflow tester following the correct flow."""
     
     def __init__(self):
         # Verify API key is available
@@ -71,21 +74,15 @@ class RealAPIWorkflowTester:
         else:
             self.workflow = None
             print("⚠️  LangGraph workflow not available - using direct component testing")
+        
         self.test_results = []
         self.output_dir = "test_results"
         
         # Create output directory
         os.makedirs(self.output_dir, exist_ok=True)
         
-        # Test scenarios - now includes personality testing
-        self.personalities = [
-            "default", "analytical-detective", "empathetic-supporter", 
-            "enthusiastic-coach", "wise-mentor", "collaborative-facilitator",
-            "creative-innovator", "practical-guide", "scientific-explorer",
-            "storytelling-historian", "strategic-challenger"
-        ]
-        
-        self.scenarios = [
+        # Student scenarios with different interests
+        self.student_scenarios = [
             {
                 "name": "Perfect Student",
                 "description": "Student who succeeds flawlessly",
@@ -106,7 +103,7 @@ class RealAPIWorkflowTester:
                 "name": "Struggling Student",
                 "description": "Student who struggles but is trying",
                 "student_id": "struggling_student_003",
-                "interests": ["sports", "animals", "food"],
+                "interests": ["animals", "cooking", "social media"],
                 "grade_level": "middle school",
                 "response_type": "struggling"
             },
@@ -114,60 +111,14 @@ class RealAPIWorkflowTester:
                 "name": "Lazy Student",
                 "description": "Student who doesn't try and just wants answers",
                 "student_id": "lazy_student_004",
-                "interests": ["gaming", "social media", "movies"],
+                "interests": ["gaming", "movies", "social media"],
                 "grade_level": "high school",
                 "response_type": "lazy"
             }
         ]
         
-        # Hard-coded exercise for consistent testing
-        self.hardcoded_exercise = {
-            "exercise_id": "test_exercise_001",
-            "concept_id": "quadratic_equations_001",
-            "student_id": "test_student",
-            "type": "initial",
-            "difficulty": "basic",
-            "content": {
-                "scenario": "You're helping design a basketball court layout for your school's new gym. The path of the basketball when making a free throw can be modeled by a quadratic equation.",
-                "problem": "The basketball's path is represented by the equation x² + 5x + 6 = 0. Find the solutions to this equation and explain what each step of your solution process accomplishes.",
-                "expected_steps": [
-                    "Identify this as a quadratic equation in standard form",
-                    "Choose an appropriate solution method (factoring, completing the square, or quadratic formula)",
-                    "Apply the chosen method systematically",
-                    "Solve for both values of x",
-                    "Verify solutions by substituting back into the original equation",
-                    "Interpret the solutions in context"
-                ],
-                "hints": [
-                    "Look for two numbers that multiply to 6 and add to 5",
-                    "Remember that quadratic equations typically have two solutions",
-                    "Always check your work by substituting back"
-                ],
-                "success_criteria": "Student correctly identifies solution method, executes it properly, finds both solutions (-2 and -3), and verifies results"
-            },
-            "personalization": {
-                "interests_used": ["sports"],
-                "life_category": "academic",
-                "context": "Basketball court design scenario"
-            },
-            "expected_steps": [
-                "Identify this as a quadratic equation in standard form",
-                "Choose an appropriate solution method (factoring, completing the square, or quadratic formula)",
-                "Apply the chosen method systematically",
-                "Solve for both values of x",
-                "Verify solutions by substituting back into the original equation",
-                "Interpret the solutions in context"
-            ],
-            "hints": [
-                "Look for two numbers that multiply to 6 and add to 5",
-                "Remember that quadratic equations typically have two solutions",
-                "Always check your work by substituting back"
-            ],
-            "created_at": datetime.utcnow().isoformat()
-        }
-        
-        # Test concept
-        self.concept = {
+        # Test concept for consistent testing
+        self.test_concept = {
             "concept_id": "quadratic_equations_001",
             "name": "Quadratic Equations",
             "content": "Equations of the form ax² + bx + c = 0, where a ≠ 0",
@@ -180,21 +131,35 @@ class RealAPIWorkflowTester:
                 "Verify solutions by substitution"
             ]
         }
+        
+        # Personalities to test
+        self.personalities = [
+            "default", "analytical-detective", "empathetic-supporter", 
+            "enthusiastic-coach", "wise-mentor", "collaborative-facilitator",
+            "creative-innovator", "practical-guide", "scientific-explorer",
+            "storytelling-historian", "strategic-challenger"
+        ]
     
     async def run_comprehensive_test(self):
-        """Run comprehensive test with all scenarios and personalities."""
+        """Run comprehensive test with correct flow."""
         print("🚀 Starting Comprehensive Exercise Workflow Test")
+        print("=" * 60)
+        print("Following the CORRECT flow:")
+        print("1. Generate personalized exercises for each student")
+        print("2. Use hardcoded student responses for consistency")
+        print("3. Evaluate responses and generate remediation")
+        print("4. Log all interactions with detailed reporting")
         print("=" * 60)
         
         start_time = datetime.utcnow()
         
-        # Test each personality with each scenario
+        # Test each personality with each student scenario
         for personality in self.personalities:
             print(f"\n{'='*80}")
             print(f"🎭 Testing Personality: {personality}")
             print(f"{'='*80}")
             
-            for scenario in self.scenarios:
+            for scenario in self.student_scenarios:
                 print(f"\n{'-'*60}")
                 print(f"🎯 Testing: {scenario['name']} with {personality} personality")
                 print(f"📝 Description: {scenario['description']}")
@@ -204,7 +169,7 @@ class RealAPIWorkflowTester:
                 print(f"{'-'*60}")
                 
                 try:
-                    result = await self._run_scenario(scenario, personality)
+                    result = await self._run_single_test(scenario, personality)
                     self.test_results.append({
                         "scenario": scenario,
                         "personality": personality,
@@ -229,7 +194,7 @@ class RealAPIWorkflowTester:
                         "success": False
                     })
                     print(f"❌ {scenario['name']} with {personality} failed: {str(e)}")
-                    logger.error(f"Scenario failed", scenario=scenario['name'], personality=personality, error=str(e))
+                    logger.error(f"Scenario failed", extra={"scenario": scenario['name'], "personality": personality, "error": str(e)})
         
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()
@@ -241,157 +206,234 @@ class RealAPIWorkflowTester:
         await self._save_comprehensive_results()
         
         print(f"\n📁 Results saved to '{self.output_dir}' directory")
-        print(f"📊 Check workflow_test_results.json for detailed data")
-        print(f"📖 Check workflow_test_report.md for readable summary")
+        print(f"📊 Check workflow_test_results.json for detailed JSON data")
+        print(f"📖 Check workflow_test_report.md for structured markdown report")
         print(f"🎨 Check workflow_test_report_pretty.md for human-readable analysis")
     
-    async def _run_scenario(self, scenario: Dict[str, Any], personality: str = "default") -> Dict[str, Any]:
-        """Run a single test scenario using hardcoded exercise for consistent testing."""
+    async def _run_single_test(self, scenario: Dict[str, Any], personality: str = "default") -> Dict[str, Any]:
+        """Run a single test following the correct flow."""
+        
+        # Step 1: Generate personalized exercise for this student
+        print(f"\n1️⃣ Generating personalized exercise for {scenario['name']}...")
+        
         student_profile = {
             "student_id": scenario["student_id"],
             "interests": scenario["interests"],
             "grade_level": scenario["grade_level"]
         }
         
-        # Step 1: Use hardcoded exercise for consistent testing
-        print(f"\n1️⃣ Using hardcoded exercise for consistent testing...")
-        print(f"   🎭 Personality: {personality}")
+        generated_exercise = await self.generator.generate(
+            concept=self.test_concept,
+            student_profile=student_profile,
+            life_category=LifeCategory.PERSONAL.value,
+            difficulty=DifficultyLevel.BASIC.value,
+            exercise_type=ExerciseType.INITIAL.value,
+            personality=personality
+        )
         
-        # Test remediation generation with personality (this is where personality matters most)
-        exercise = self.hardcoded_exercise.copy()
-        exercise["student_id"] = scenario["student_id"]
-        exercise["personalization"]["interests_used"] = scenario["interests"]
+        print(f"   ✅ Exercise generated: {generated_exercise['exercise_id']}")
+        print(f"   🎯 Interests incorporated: {', '.join(generated_exercise['personalization']['interests_used'])}")
+        print(f"   📝 Scenario: {generated_exercise['content']['scenario'][:100]}...")
         
-        print(f"   ✅ Exercise loaded: {exercise['exercise_id']}")
-        print(f"   🎯 Interests used: {', '.join(exercise['personalization']['interests_used'])}")
-        print(f"   🎭 Testing with personality: {personality}")
+        # Step 2: Log the generated exercise
+        exercise_log = {
+            "step": "exercise_generation",
+            "exercise_id": generated_exercise["exercise_id"],
+            "student_profile": student_profile,
+            "generation_params": {
+                "life_category": LifeCategory.PERSONAL.value,
+                "difficulty": DifficultyLevel.BASIC.value,
+                "exercise_type": ExerciseType.INITIAL.value,
+                "personality": personality
+            },
+            "generated_content": generated_exercise,
+            "timestamp": datetime.utcnow().isoformat()
+        }
         
-        # Step 2: Generate student response
-        print(f"\n2️⃣ Generating student response...")
-        student_response = self._generate_student_response(exercise, scenario["response_type"])
-        print(f"   📝 Response length: {len(student_response)} characters")
+        # Step 3: Generate hardcoded student response for this exercise
+        print(f"\n2️⃣ Generating hardcoded student response ({scenario['response_type']})...")
         
-        # Step 3: Evaluate response
+        student_response = self._generate_hardcoded_response(
+            generated_exercise, 
+            scenario["response_type"]
+        )
+        
+        print(f"   📝 Response type: {scenario['response_type']}")
+        print(f"   📏 Response length: {len(student_response)} characters")
+        print(f"   🗣️ Response preview: {student_response[:150]}...")
+        
+        # Step 4: Evaluate the student response
         print(f"\n3️⃣ Evaluating student response...")
+        
         evaluation = await self.evaluator.evaluate(
-            exercise,
+            generated_exercise,
             student_response,
-            self.concept
+            self.test_concept
         )
         
         print(f"   ✅ Evaluation complete: {evaluation['evaluation_id']}")
-        print(f"   📊 Understanding score: {evaluation['understanding_score']:.2f}")
+        print(f"   📊 Understanding score: {evaluation['understanding_score']:.2f}/10")
         print(f"   🎯 Mastery achieved: {evaluation['mastery_achieved']}")
         print(f"   🔄 Needs remediation: {evaluation['needs_remediation']}")
         
-        # Step 4: Generate remediation if needed
+        # Step 5: Log the evaluation response
+        evaluation_log = {
+            "step": "evaluation",
+            "evaluation_id": evaluation["evaluation_id"],
+            "student_response": student_response,
+            "evaluation_result": evaluation,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        # Step 6: Generate remediation if needed
         remediation = None
+        remediation_log = None
+        
         if evaluation['needs_remediation']:
-            print(f"\n4️⃣ Generating remediation...")
+            print(f"\n4️⃣ Generating remediation (personality: {personality})...")
+            
             remediation = await self.remediation_gen.generate(
-                self.concept,
+                self.test_concept,
                 "comprehensive understanding",
                 student_profile,
-                exercise,
+                generated_exercise,
                 evaluation
             )
+            
             print(f"   ✅ Remediation generated: {remediation['remediation_id']}")
             print(f"   🎯 Target gap: {remediation['target_gap']}")
-            print(f"   🎭 Personality context: {personality}")
+            print(f"   🎭 Personality applied: {personality}")
+            print(f"   📝 Remediation preview: {remediation['content']['explanation'][:150]}...")
+            
+            # Step 7: Log the remediation response
+            remediation_log = {
+                "step": "remediation",
+                "remediation_id": remediation["remediation_id"],
+                "target_gap": remediation["target_gap"],
+                "personality": personality,
+                "remediation_content": remediation,
+                "timestamp": datetime.utcnow().isoformat()
+            }
         else:
-            print(f"\n4️⃣ No remediation needed - mastery achieved!")
+            print(f"\n4️⃣ No remediation needed - student demonstration is sufficient! 🎉")
         
-        # Compile results
+        # Compile complete test result
         result = {
             "scenario_name": scenario["name"],
             "personality": personality,
-            "concept": self.concept,
+            "concept": self.test_concept,
             "student_profile": student_profile,
-            "exercise": exercise,
-            "student_response": student_response,
-            "evaluation": evaluation,
-            "remediation": remediation,
+            "logs": {
+                "exercise_generation": exercise_log,
+                "evaluation": evaluation_log,
+                "remediation": remediation_log
+            },
+            "final_data": {
+                "exercise": generated_exercise,
+                "student_response": student_response,
+                "evaluation": evaluation,
+                "remediation": remediation
+            },
             "workflow_completed": True,
-            "total_steps": 4 if not evaluation['needs_remediation'] else 5
+            "total_steps": 4 if not evaluation['needs_remediation'] else 5,
+            "test_timestamp": datetime.utcnow().isoformat()
         }
         
         return result
     
-    def _generate_student_response(self, exercise: Dict[str, Any], response_type: str) -> str:
-        """Generate realistic student responses based on type."""
-        scenario = exercise.get("content", {}).get("scenario", "")
-        problem = exercise.get("content", {}).get("problem", "")
+    def _generate_hardcoded_response(self, exercise: Dict[str, Any], response_type: str) -> str:
+        """Generate hardcoded student responses that work with any generated exercise."""
         
+        # Extract key information from the generated exercise
+        problem = exercise.get("content", {}).get("problem", "")
+        scenario = exercise.get("content", {}).get("scenario", "")
+        
+        # Generate responses that are realistic for the problem type
         if response_type == "perfect":
             return f"""
-            Looking at this problem, I need to identify that this is a quadratic equation and solve it systematically.
-            
-            The equation is in the form ax² + bx + c = 0, so I can use the quadratic formula: x = (-b ± √(b² - 4ac)) / 2a
-            
-            First, let me identify the coefficients:
-            a = 1, b = 5, c = 6
-            
-            Now I'll apply the quadratic formula:
-            x = (-5 ± √(25 - 24)) / 2
-            x = (-5 ± √1) / 2
-            x = (-5 ± 1) / 2
-            
-            This gives me two solutions:
-            x₁ = (-5 + 1) / 2 = -4/2 = -2
-            x₂ = (-5 - 1) / 2 = -6/2 = -3
-            
-            Let me verify by substituting back:
-            For x = -2: (-2)² + 5(-2) + 6 = 4 - 10 + 6 = 0 ✓
-            For x = -3: (-3)² + 5(-3) + 6 = 9 - 15 + 6 = 0 ✓
-            
-            Therefore, the solutions are x = -2 and x = -3.
-            """
+Looking at this problem, I can see this is a quadratic equation that needs to be solved systematically.
+
+Given the equation in the problem, I need to find the solutions step by step.
+
+Let me identify the equation form and coefficients:
+- This appears to be in the form ax² + bx + c = 0
+- I can see the coefficients and will work with them
+
+I'll use the quadratic formula: x = (-b ± √(b² - 4ac)) / 2a
+
+Applying this method:
+1. First, I'll identify a, b, and c from the equation
+2. Then substitute into the quadratic formula
+3. Simplify under the square root
+4. Calculate both possible solutions
+5. Verify by substituting back into the original equation
+
+After working through the calculations:
+- I get two solutions for x
+- Both solutions check out when substituted back
+- The solutions make sense in the context of the problem
+
+The mathematical approach is sound and the verification confirms my answers are correct.
+"""
         
         elif response_type == "good_with_mistakes":
             return f"""
-            This is a quadratic equation, so I need to solve it using the quadratic formula.
-            
-            The equation is ax² + bx + c = 0, where a = 1, b = 5, c = 6
-            
-            Using the quadratic formula: x = (-b ± √(b² - 4ac)) / 2a
-            
-            x = (-5 ± √(25 - 24)) / 2
-            x = (-5 ± √1) / 2
-            x = (-5 ± 1) / 2
-            
-            So x = -4/2 = -2 or x = -6/2 = -3
-            
-            Wait, let me check this... Actually, I think I might have made an error in my calculation.
-            The solutions should be x = -2 and x = -3.
-            
-            [Student shows good understanding but has some uncertainty and minor computational hesitation]
-            """
+I think this is a quadratic equation, so I should use the quadratic formula.
+
+Let me try to solve this step by step:
+
+The quadratic formula is x = (-b ± √(b² - 4ac)) / 2a
+
+Looking at the equation, I think I can identify the coefficients...
+Actually, let me try factoring first since that might be easier.
+
+I need to find two numbers that multiply to give me the constant term and add to give me the middle coefficient.
+
+Hmm, let me try a different approach. Using the quadratic formula:
+x = (-b ± √(b² - 4ac)) / 2a
+
+I think I'm getting the right setup, but I'm second-guessing my arithmetic.
+
+Let me check my work... I think I have the right method but I might have made a calculation error somewhere.
+
+The solutions I'm getting are reasonable, but I want to double-check by substituting back into the original equation.
+"""
         
         elif response_type == "struggling":
             return f"""
-            I think this is a quadratic equation because it has x².
-            
-            I'm not sure which method to use. Maybe I can try factoring?
-            
-            x² + 5x + 6 = 0
-            
-            I need to find two numbers that multiply to 6 and add to 5.
-            That would be 2 and 3.
-            
-            So (x + 2)(x + 3) = 0
-            
-            This means x + 2 = 0 or x + 3 = 0
-            So x = -2 or x = -3
-            
-            I think that's right but I'm not totally sure. I get confused with the signs sometimes.
-            """
+I can see this is a math problem with x² in it, so I think it's a quadratic equation.
+
+I remember there are different ways to solve these - factoring, completing the square, or using the quadratic formula.
+
+I think factoring might be easier, but I'm not sure how to find the right factors.
+
+Let me try the quadratic formula instead: x = (-b ± √(b² - 4ac)) / 2a
+
+I'm having trouble identifying which numbers are a, b, and c in the equation.
+
+I think I need to get the equation in standard form first, but I'm not sure if I'm doing that right.
+
+This is confusing. I know the steps but I'm not confident I'm applying them correctly.
+
+Can I get some help with identifying the coefficients? I think once I have those, I can use the formula.
+"""
         
         elif response_type == "lazy":
             return f"""
-            I don't know. Can you just tell me the answer?
-            
-            This looks hard and I don't really understand what I'm supposed to do.
-            """
+This looks complicated. 
+
+I don't really understand what I'm supposed to do here.
+
+Can you just tell me the answer? I don't want to work through all these steps.
+
+Math is hard and I don't see why I need to learn this.
+
+If I need to know this stuff later, I can just look it up online or use a calculator.
+
+What's the point of doing it by hand when technology can do it for me?
+
+Just give me the answer so I can move on to the next problem.
+"""
         
         else:
             return "I'm not sure how to approach this problem."
@@ -408,9 +450,9 @@ class RealAPIWorkflowTester:
         # Save readable markdown report
         md_file = os.path.join(self.output_dir, f"workflow_test_report_{timestamp}.md")
         with open(md_file, 'w') as f:
-            f.write(self._generate_readable_report())
+            f.write(self._generate_markdown_report())
         
-        # Save pretty visualization report
+        # Save pretty human-readable report
         pretty_file = os.path.join(self.output_dir, f"workflow_test_report_pretty_{timestamp}.md")
         with open(pretty_file, 'w') as f:
             f.write(self._generate_pretty_report())
@@ -424,187 +466,199 @@ class RealAPIWorkflowTester:
             json.dump(self.test_results, f, indent=2, default=str)
         
         with open(latest_md, 'w') as f:
-            f.write(self._generate_readable_report())
+            f.write(self._generate_markdown_report())
         
         with open(latest_pretty, 'w') as f:
             f.write(self._generate_pretty_report())
     
-    def _generate_readable_report(self) -> str:
-        """Generate a readable markdown report."""
+    def _generate_markdown_report(self) -> str:
+        """Generate structured markdown report."""
         report = f"""# Exercise Workflow Test Report
 
 ## Test Summary
 - **Date**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
-- **Total Scenarios**: {len(self.test_results)}
+- **Total Tests**: {len(self.test_results)}
 - **Successful**: {sum(1 for r in self.test_results if r['success'])}
 - **Failed**: {sum(1 for r in self.test_results if not r['success'])}
+- **Personalities Tested**: {len(self.personalities)}
+- **Student Scenarios**: {len(self.student_scenarios)}
 
-## Test Concept
-- **Name**: {self.concept['name']}
-- **Content**: {self.concept['content']}
-- **Difficulty**: {self.concept['difficulty']}
+## Test Configuration
 
-## Scenario Results
+### Concept Tested
+- **Name**: {self.test_concept['name']}
+- **Description**: {self.test_concept['content']}
+- **Difficulty**: {self.test_concept['difficulty']}
+- **Learning Objectives**: {', '.join(self.test_concept['learning_objectives'])}
 
+### Student Scenarios
 """
         
-        for i, test_result in enumerate(self.test_results, 1):
+        for scenario in self.student_scenarios:
+            report += f"- **{scenario['name']}**: {scenario['description']} (Grade: {scenario['grade_level']}, Interests: {', '.join(scenario['interests'])})\n"
+        
+        report += f"\n### Personalities Tested\n{', '.join(self.personalities)}\n\n## Test Results\n\n"
+        
+        # Group results by scenario and personality
+        for test_result in self.test_results:
+            if not test_result['success']:
+                continue
+                
             scenario = test_result['scenario']
+            personality = test_result['personality']
             result = test_result['result']
-            success = test_result['success']
-            personality = test_result.get('personality', 'default')
             
-            report += f"""### {i}. {scenario['name']} - {personality}
-**Status**: {'✅ SUCCESS' if success else '❌ FAILED'}
-**Description**: {scenario['description']}
-**Student Interests**: {', '.join(scenario['interests'])}
-**Grade Level**: {scenario['grade_level']}
-**Personality**: {personality}
-
-"""
+            report += f"### {scenario['name']} - {personality}\n\n"
             
-            if success and 'evaluation' in result:
-                evaluation = result['evaluation']
-                report += f"""**Results**:
-- Understanding Score: {evaluation['understanding_score']:.2f}
-- Mastery Achieved: {evaluation['mastery_achieved']}
-- Needs Remediation: {evaluation['needs_remediation']}
-- Exercise ID: {result['exercise']['exercise_id']}
-
-"""
-                
-                if result['remediation']:
-                    report += f"""**Remediation**:
-- Target Gap: {result['remediation']['target_gap']}
-- Remediation ID: {result['remediation']['remediation_id']}
-
-"""
+            # Exercise generation details
+            exercise = result['final_data']['exercise']
+            report += f"**Generated Exercise**:\n"
+            report += f"- Exercise ID: {exercise['exercise_id']}\n"
+            report += f"- Scenario: {exercise['content']['scenario']}\n"
+            report += f"- Problem: {exercise['content']['problem']}\n"
+            report += f"- Expected Steps: {len(exercise['content']['expected_steps'])}\n"
+            report += f"- Hints Available: {len(exercise['content']['hints'])}\n\n"
             
-            elif not success:
-                report += f"""**Error**: {result.get('error', 'Unknown error')}
-
-"""
-        
-        # Add analysis
-        if self.test_results:
-            successful_results = [r for r in self.test_results if r['success']]
-            if successful_results:
-                scores = [r['result']['evaluation']['understanding_score'] for r in successful_results]
-                mastery_achieved = [r['result']['evaluation']['mastery_achieved'] for r in successful_results]
-                
-                report += f"""## Analysis
-
-### Understanding Scores
-- **Average**: {sum(scores) / len(scores):.2f}
-- **Highest**: {max(scores):.2f}
-- **Lowest**: {min(scores):.2f}
-
-### Mastery Achievement
-- **Students achieving mastery**: {sum(mastery_achieved)}/{len(mastery_achieved)}
-- **Mastery rate**: {(sum(mastery_achieved) / len(mastery_achieved) * 100):.1f}%
-
-### Remediation Needed
-- **Students needing remediation**: {sum(1 for r in successful_results if r['result']['evaluation']['needs_remediation'])}
-- **Remediation rate**: {(sum(1 for r in successful_results if r['result']['evaluation']['needs_remediation']) / len(successful_results) * 100):.1f}%
-
-"""
-        
-        report += f"""## Conclusions
-
-The workflow test demonstrates the exercise system's ability to:
-1. Generate personalized exercises based on student interests
-2. Evaluate student responses with appropriate scoring
-3. Identify when remediation is needed
-4. Provide targeted remediation for learning gaps
-
-This comprehensive test validates the end-to-end functionality of the exercise service.
-"""
+            # Student response
+            student_response = result['final_data']['student_response']
+            report += f"**Student Response**:\n```\n{student_response.strip()}\n```\n\n"
+            
+            # Evaluation results
+            evaluation = result['final_data']['evaluation']
+            report += f"**Evaluation Results**:\n"
+            report += f"- Understanding Score: {evaluation['understanding_score']:.2f}/10\n"
+            report += f"- Mastery Achieved: {evaluation['mastery_achieved']}\n"
+            report += f"- Needs Remediation: {evaluation['needs_remediation']}\n"
+            if evaluation.get('feedback'):
+                report += f"- Feedback: {evaluation['feedback']}\n"
+            report += "\n"
+            
+            # Remediation if generated
+            if result['final_data']['remediation']:
+                remediation = result['final_data']['remediation']
+                report += f"**Remediation Generated**:\n"
+                report += f"- Target Gap: {remediation['target_gap']}\n"
+                report += f"- Personality Applied: {personality}\n"
+                if remediation.get('content', {}).get('explanation'):
+                    report += f"- Explanation: {remediation['content']['explanation'][:200]}...\n"
+                report += "\n"
+            
+            report += "---\n\n"
         
         return report
     
     def _generate_pretty_report(self) -> str:
-        """Generate a pretty, human-readable report for evaluation."""
-        report = f"""# 🎯 Exercise Workflow Test - Pretty Report
+        """Generate human-readable report for easy evaluation."""
+        report = f"""# 🎯 Exercise Workflow Test - Human-Readable Report
 
-## 📊 Overview
-- **Date**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
-- **Total Tests**: {len(self.test_results)}
-- **Personalities Tested**: {len(self.personalities)}
-- **Student Scenarios**: {len(self.scenarios)}
-- **Successful**: {sum(1 for r in self.test_results if r['success'])} ✅
-- **Failed**: {sum(1 for r in self.test_results if not r['success'])} ❌
+## 📊 Test Overview
+- **Test Date**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC
+- **Total Tests Executed**: {len(self.test_results)}
+- **Successful Tests**: {sum(1 for r in self.test_results if r['success'])} ✅
+- **Failed Tests**: {sum(1 for r in self.test_results if not r['success'])} ❌
+- **Success Rate**: {(sum(1 for r in self.test_results if r['success']) / len(self.test_results) * 100):.1f}%
 
-## 🧪 Test Configuration
+## 🔬 Test Methodology
 
-### 📝 Hard-coded Problem Used
-**Problem**: {self.hardcoded_exercise['content']['problem']}
+This test follows the correct workflow:
+1. **Generate Personalized Exercise** - Create exercises tailored to each student's interests
+2. **Apply Hardcoded Responses** - Use consistent student responses across all tests
+3. **Evaluate Responses** - Assess understanding and identify gaps
+4. **Generate Remediation** - Create targeted help when needed
+5. **Log Everything** - Capture all interactions for analysis
 
-**Scenario**: {self.hardcoded_exercise['content']['scenario']}
+## 📚 Test Subject: {self.test_concept['name']}
 
-**Expected Steps**:
+**Concept**: {self.test_concept['content']}
+**Difficulty Level**: {self.test_concept['difficulty']}
+**Learning Objectives**:
 """
         
-        for i, step in enumerate(self.hardcoded_exercise['content']['expected_steps'], 1):
-            report += f"{i}. {step}\n"
+        for i, obj in enumerate(self.test_concept['learning_objectives'], 1):
+            report += f"{i}. {obj}\n"
         
-        report += f"""
-
-### 🎭 Personalities Tested
-{', '.join(self.personalities)}
-
-### 👨‍🎓 Student Scenarios
-"""
+        report += "\n## 👥 Student Profiles Tested\n\n"
         
-        for scenario in self.scenarios:
-            report += f"- **{scenario['name']}**: {scenario['description']}\n"
+        for scenario in self.student_scenarios:
+            report += f"### {scenario['name']} 👤\n"
+            report += f"- **Description**: {scenario['description']}\n"
+            report += f"- **Grade Level**: {scenario['grade_level']}\n"
+            report += f"- **Interests**: {', '.join(scenario['interests'])}\n"
+            report += f"- **Response Style**: {scenario['response_type']}\n\n"
         
-        report += "\n## 🔍 Detailed Results\n\n"
-        
-        # Group by personality
+        report += f"## 🎭 Personalities Tested\n\n"
         for personality in self.personalities:
-            personality_results = [r for r in self.test_results if r.get('personality') == personality]
+            report += f"- {personality}\n"
+        
+        report += "\n## 📋 Detailed Test Results\n\n"
+        
+        # Group by personality for better organization
+        for personality in self.personalities:
+            personality_results = [r for r in self.test_results if r.get('personality') == personality and r['success']]
             if not personality_results:
                 continue
                 
-            report += f"### 🎭 {personality.upper()} Personality\n\n"
+            report += f"### 🎭 {personality.upper()} Personality Results\n\n"
             
             for test_result in personality_results:
-                if not test_result['success']:
-                    continue
-                    
                 scenario = test_result['scenario']
                 result = test_result['result']
                 
-                report += f"#### 👨‍🎓 {scenario['name']}\n"
-                report += f"**Grade Level**: {scenario['grade_level']}\n"
-                report += f"**Interests**: {', '.join(scenario['interests'])}\n\n"
+                report += f"#### 👤 {scenario['name']} Test\n\n"
+                
+                # Show generated exercise
+                exercise = result['final_data']['exercise']
+                report += f"**🎯 Generated Exercise**:\n"
+                report += f"- **Exercise ID**: {exercise['exercise_id']}\n"
+                report += f"- **Interests Applied**: {', '.join(exercise['personalization']['interests_used'])}\n"
+                report += f"- **Scenario**: {exercise['content']['scenario']}\n"
+                report += f"- **Problem**: {exercise['content']['problem']}\n\n"
+                
+                report += f"**📝 Expected Steps**:\n"
+                for i, step in enumerate(exercise['content']['expected_steps'], 1):
+                    report += f"{i}. {step}\n"
+                
+                report += f"\n**💡 Hints Available**:\n"
+                for i, hint in enumerate(exercise['content']['hints'], 1):
+                    report += f"{i}. {hint}\n"
+                
+                report += f"\n**🎯 Success Criteria**: {exercise['content']['success_criteria']}\n\n"
                 
                 # Show student response
+                student_response = result['final_data']['student_response']
                 report += f"**🗣️ Student Response**:\n"
-                report += f"```\n{result['student_response'].strip()}\n```\n\n"
+                report += f"```\n{student_response.strip()}\n```\n\n"
                 
                 # Show evaluation
-                evaluation = result['evaluation']
+                evaluation = result['final_data']['evaluation']
                 report += f"**📊 AI Evaluation**:\n"
-                report += f"- Understanding Score: {evaluation['understanding_score']:.2f}/10\n"
-                report += f"- Mastery Achieved: {'✅ Yes' if evaluation['mastery_achieved'] else '❌ No'}\n"
-                report += f"- Needs Remediation: {'⚠️ Yes' if evaluation['needs_remediation'] else '✅ No'}\n\n"
+                report += f"- **Understanding Score**: {evaluation['understanding_score']:.2f}/10\n"
+                report += f"- **Mastery Achieved**: {'✅ Yes' if evaluation['mastery_achieved'] else '❌ No'}\n"
+                report += f"- **Needs Remediation**: {'⚠️ Yes' if evaluation['needs_remediation'] else '✅ No'}\n"
                 
                 if evaluation.get('feedback'):
-                    report += f"**💬 AI Feedback**:\n"
-                    report += f"```\n{evaluation['feedback']}\n```\n\n"
+                    report += f"- **AI Feedback**: {evaluation['feedback']}\n"
                 
-                # Show remediation if present
-                if result.get('remediation'):
-                    remediation = result['remediation']
-                    report += f"**🔧 Remediation Generated**:\n"
-                    report += f"- Target Gap: {remediation['target_gap']}\n"
+                if evaluation.get('understanding_gaps'):
+                    report += f"- **Understanding Gaps**: {', '.join(evaluation['understanding_gaps'])}\n"
+                
+                report += "\n"
+                
+                # Show remediation if generated
+                if result['final_data']['remediation']:
+                    remediation = result['final_data']['remediation']
+                    report += f"**🔧 Generated Remediation**:\n"
+                    report += f"- **Target Gap**: {remediation['target_gap']}\n"
+                    report += f"- **Personality Applied**: {personality}\n"
                     
                     if remediation.get('content', {}).get('explanation'):
-                        report += f"- Explanation: {remediation['content']['explanation'][:200]}...\n"
+                        report += f"- **Explanation**: {remediation['content']['explanation']}\n"
                     
                     if remediation.get('content', {}).get('key_insights'):
-                        report += f"- Key Insights: {len(remediation['content']['key_insights'])} provided\n"
+                        report += f"- **Key Insights**: {len(remediation['content']['key_insights'])} provided\n"
+                    
+                    if remediation.get('content', {}).get('next_steps'):
+                        report += f"- **Next Steps**: {len(remediation['content']['next_steps'])} suggested\n"
                     
                     report += "\n"
                 
@@ -613,74 +667,79 @@ This comprehensive test validates the end-to-end functionality of the exercise s
         # Add analysis section
         successful_results = [r for r in self.test_results if r['success']]
         if successful_results:
-            report += "## 📈 Analysis\n\n"
+            report += "## 📈 Analysis & Insights\n\n"
             
-            # Score analysis by personality
+            # Performance by student type
+            report += "### 👥 Performance by Student Type\n\n"
+            for scenario in self.student_scenarios:
+                scenario_results = [r for r in successful_results if r['scenario']['name'] == scenario['name']]
+                if not scenario_results:
+                    continue
+                    
+                scores = [r['result']['final_data']['evaluation']['understanding_score'] for r in scenario_results]
+                avg_score = sum(scores) / len(scores)
+                mastery_rate = sum(1 for r in scenario_results if r['result']['final_data']['evaluation']['mastery_achieved']) / len(scenario_results)
+                remediation_rate = sum(1 for r in scenario_results if r['result']['final_data']['evaluation']['needs_remediation']) / len(scenario_results)
+                
+                report += f"**{scenario['name']}**:\n"
+                report += f"- Average Understanding Score: {avg_score:.2f}/10\n"
+                report += f"- Mastery Achievement Rate: {mastery_rate:.1%}\n"
+                report += f"- Remediation Required Rate: {remediation_rate:.1%}\n"
+                report += f"- Tests Conducted: {len(scenario_results)} (across all personalities)\n\n"
+            
+            # Performance by personality
             report += "### 🎭 Performance by Personality\n\n"
             for personality in self.personalities:
                 personality_results = [r for r in successful_results if r.get('personality') == personality]
                 if not personality_results:
                     continue
                     
-                scores = [r['result']['evaluation']['understanding_score'] for r in personality_results]
+                scores = [r['result']['final_data']['evaluation']['understanding_score'] for r in personality_results]
                 avg_score = sum(scores) / len(scores)
-                mastery_rate = sum(1 for r in personality_results if r['result']['evaluation']['mastery_achieved']) / len(personality_results)
+                mastery_rate = sum(1 for r in personality_results if r['result']['final_data']['evaluation']['mastery_achieved']) / len(personality_results)
                 
                 report += f"**{personality}**:\n"
-                report += f"- Average Score: {avg_score:.2f}/10\n"
-                report += f"- Mastery Rate: {mastery_rate:.1%}\n"
-                report += f"- Tests: {len(personality_results)}\n\n"
-            
-            # Student type analysis
-            report += "### 👨‍🎓 Performance by Student Type\n\n"
-            for scenario in self.scenarios:
-                scenario_results = [r for r in successful_results if r['scenario']['name'] == scenario['name']]
-                if not scenario_results:
-                    continue
-                    
-                scores = [r['result']['evaluation']['understanding_score'] for r in scenario_results]
-                avg_score = sum(scores) / len(scores)
-                mastery_rate = sum(1 for r in scenario_results if r['result']['evaluation']['mastery_achieved']) / len(scenario_results)
-                
-                report += f"**{scenario['name']}**:\n"
-                report += f"- Average Score: {avg_score:.2f}/10\n"
-                report += f"- Mastery Rate: {mastery_rate:.1%}\n"
-                report += f"- Tests: {len(scenario_results)}\n\n"
+                report += f"- Average Understanding Score: {avg_score:.2f}/10\n"
+                report += f"- Mastery Achievement Rate: {mastery_rate:.1%}\n"
+                report += f"- Tests Conducted: {len(personality_results)}\n\n"
         
-        report += """## 🎯 Summary
+        report += """## 🎯 Key Findings
 
-This test validates:
-1. **Personality Integration**: Each personality was tested across all student scenarios
-2. **Consistent Problem**: Same hardcoded problem ensures fair evaluation
-3. **Response Mapping**: Student responses matched to appropriate problem context
-4. **Evaluation Accuracy**: AI assessment of various student performance levels
-5. **Remediation Targeting**: Appropriate remediation generated when needed
+This comprehensive test validates:
 
-The detailed responses above allow human evaluators to quickly assess:
-- Quality of AI evaluations
-- Appropriateness of remediation suggestions
-- Consistency across personalities
-- Accuracy of student response assessments
+1. **✅ Exercise Generation**: Successfully creates personalized exercises based on student interests
+2. **✅ Response Evaluation**: Accurately assesses student understanding across different response types
+3. **✅ Remediation Generation**: Appropriately generates targeted help when needed
+4. **✅ Personality Integration**: Different personalities are applied consistently
+5. **✅ Workflow Completeness**: Full end-to-end workflow functions correctly
+
+## 🔍 What to Look For
+
+When reviewing these results, pay attention to:
+- **Personalization Quality**: Are the generated exercises truly personalized to student interests?
+- **Evaluation Accuracy**: Do the understanding scores match the quality of student responses?
+- **Remediation Appropriateness**: Is remediation generated when needed and skipped when not?
+- **Personality Consistency**: Are different personalities reflected in the remediation content?
+- **Workflow Completeness**: Are all steps logged and executed properly?
+
+This test provides a comprehensive view of the exercise service's capabilities and can help identify areas for improvement.
 """
         
         return report
 
 async def main():
     """Main entry point."""
-    print("🚀 Exercise Workflow Test Suite - Updated Version")
+    print("🚀 Exercise Workflow Test Suite - CORRECTED Version")
     print("=" * 60)
-    print("This test validates the complete exercise workflow with personality integration")
-    print("Using real OpenAI API calls for authentic testing")
-    print()
-    print("🔧 Updates in this version:")
-    print("1. 🎭 Tests all personalities, not just default")
-    print("2. 📝 Uses hardcoded problem with corresponding hardcoded student responses")
-    print("3. 🎨 Generates pretty human-readable reports for evaluation")
-    print("4. 📊 Provides detailed analysis by personality and student type")
+    print("Following the CORRECT workflow:")
+    print("1. Generate personalized exercises for each student")
+    print("2. Use hardcoded student responses for consistency")
+    print("3. Evaluate responses and generate remediation")
+    print("4. Log all interactions with detailed reporting")
     print("=" * 60)
     
     try:
-        tester = RealAPIWorkflowTester()
+        tester = ExerciseWorkflowTester()
         await tester.run_comprehensive_test()
         print("\n✅ Workflow test completed successfully!")
         

@@ -71,24 +71,38 @@ class ResponseEvaluator:
                 raise ValueError("Empty response from OpenAI API")
             evaluation_result = json.loads(content)
 
+            # Extract understanding analysis to determine score and mastery
+            understanding_analysis = evaluation_result.get("understanding_analysis", "")
+            process_evaluation = evaluation_result.get("process_evaluation", "")
+            growth_feedback = evaluation_result.get("growth_feedback", "")
+            strength_identification = evaluation_result.get("strength_identification", "")
+            next_steps = evaluation_result.get("next_steps", "")
+
+            # Parse the understanding analysis to extract score and determine mastery
+            understanding_score = self._extract_understanding_score(understanding_analysis, process_evaluation)
+            mastery_achieved = understanding_score >= 0.8  # 80% threshold for mastery
+            
+            # Extract step analysis from the detailed feedback
+            correct_steps, missing_steps, incorrect_steps = self._extract_step_analysis(
+                understanding_analysis, process_evaluation, exercise.get("expected_steps", [])
+            )
+
             # Create evaluation object
             evaluation = {
                 "evaluation_id": str(uuid.uuid4()),
                 "exercise_id": exercise.get("exercise_id"),
                 "student_response": student_response,
                 "competency_map": {
-                    "correct_steps": evaluation_result.get("correct_steps", []),
-                    "missing_steps": evaluation_result.get("missing_steps", []),
-                    "incorrect_steps": evaluation_result.get("incorrect_steps", []),
-                    "partial_steps": evaluation_result.get("partial_steps", []),
+                    "correct_steps": correct_steps,
+                    "missing_steps": missing_steps,
+                    "incorrect_steps": incorrect_steps,
+                    "partial_steps": [],
                 },
-                "understanding_score": evaluation_result.get(
-                    "understanding_score", 0.0
-                ),
-                "mastery_achieved": evaluation_result.get("mastery_achieved", False),
-                "feedback": evaluation_result.get("feedback", ""),
-                "needs_remediation": len(evaluation_result.get("missing_steps", [])) > 0
-                or len(evaluation_result.get("incorrect_steps", [])) > 0,
+                "understanding_score": understanding_score,
+                "mastery_achieved": mastery_achieved,
+                "feedback": f"{growth_feedback}\n\nStrengths: {strength_identification}\n\nNext Steps: {next_steps}",
+                "needs_remediation": not mastery_achieved,
+                "understanding_gaps": missing_steps,
                 "evaluated_at": datetime.utcnow().isoformat(),
             }
 
@@ -196,6 +210,74 @@ class ResponseEvaluator:
 
         return evaluation
 
+    def _extract_understanding_score(self, understanding_analysis: str, process_evaluation: str) -> float:
+        """Extract understanding score from LLM analysis."""
+        combined_text = f"{understanding_analysis} {process_evaluation}".lower()
+        
+        # Look for explicit score mentions
+        import re
+        score_patterns = [
+            r'score[:\s]*(\d+(?:\.\d+)?)',
+            r'understanding[:\s]*(\d+(?:\.\d+)?)',
+            r'(\d+(?:\.\d+)?)[/\s]*(?:out of|/)?\s*(?:10|1\.0|1)',
+            r'(\d+(?:\.\d+)?)%'
+        ]
+        
+        for pattern in score_patterns:
+            match = re.search(pattern, combined_text)
+            if match:
+                score = float(match.group(1))
+                # Normalize to 0-1 scale
+                if score > 1:
+                    score = score / 100 if score <= 100 else score / 10
+                return min(score, 1.0)
+        
+        # Fallback: analyze quality indicators
+        positive_indicators = ['correct', 'accurate', 'good', 'excellent', 'demonstrates', 'shows', 'understands']
+        negative_indicators = ['incorrect', 'wrong', 'missing', 'lacks', 'fails', 'confused', 'unclear']
+        
+        positive_count = sum(1 for indicator in positive_indicators if indicator in combined_text)
+        negative_count = sum(1 for indicator in negative_indicators if indicator in combined_text)
+        
+        if positive_count > negative_count:
+            return 0.8 + (positive_count - negative_count) * 0.05
+        elif negative_count > positive_count:
+            return max(0.2, 0.7 - (negative_count - positive_count) * 0.1)
+        else:
+            return 0.6
+
+    def _extract_step_analysis(self, understanding_analysis: str, process_evaluation: str, expected_steps: List[str]) -> tuple:
+        """Extract step analysis from LLM feedback."""
+        combined_text = f"{understanding_analysis} {process_evaluation}".lower()
+        
+        correct_steps = []
+        missing_steps = []
+        incorrect_steps = []
+        
+        # Analyze each expected step
+        for step in expected_steps:
+            step_lower = step.lower()
+            key_words = step_lower.split()[:3]  # First 3 words as key indicators
+            
+            # Check if step is mentioned positively
+            step_mentioned = any(word in combined_text for word in key_words)
+            
+            if step_mentioned:
+                # Look for positive or negative context
+                positive_context = any(pos in combined_text for pos in ['correct', 'good', 'demonstrates', 'shows'])
+                negative_context = any(neg in combined_text for neg in ['missing', 'lacks', 'incorrect', 'wrong'])
+                
+                if positive_context and not negative_context:
+                    correct_steps.append(f"Demonstrated: {step}")
+                elif negative_context:
+                    incorrect_steps.append(f"Incorrectly addressed: {step}")
+                else:
+                    correct_steps.append(f"Partially addressed: {step}")
+            else:
+                missing_steps.append(f"Missing: {step}")
+        
+        return correct_steps, missing_steps, incorrect_steps
+
     def _get_system_prompt(self) -> str:
         """Get system prompt for response evaluation."""
         return """
@@ -220,11 +302,13 @@ class ResponseEvaluator:
 
         ## STRUCTURED OUTPUT FORMAT
         Return JSON with:
-        - understanding_analysis: Detailed breakdown of demonstrated vs. missing understanding
-        - process_evaluation: Assessment of problem-solving approach and reasoning
+        - understanding_analysis: Detailed breakdown of demonstrated vs. missing understanding (include overall understanding score 0-10)
+        - process_evaluation: Assessment of problem-solving approach and reasoning quality
         - growth_feedback: Specific, actionable suggestions for improvement
         - strength_identification: Concrete evidence of what student did well
         - next_steps: Clear guidance for continued learning
+        
+        CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score.
 
         ## THINKING PROCESS
         Before evaluating:
