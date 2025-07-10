@@ -1,41 +1,65 @@
 # Spool Exercise Service
 
-Exercise generation, evaluation, and remediation service with LangGraph orchestration for the Spool platform.
+AI-powered exercise generation, evaluation, and remediation service for the Spool educational platform.
 
-**Status:** ✅ Deployed to CodeBuild
+**Status:** ✅ Enhanced with Pinecone Vector Search Integration
 
 ## Overview
 
 The Exercise Service is responsible for:
 
-- **Dynamic Exercise Generation**: Create personalized exercises based on student interests
-- **Response Evaluation**: Analyze student explanations to identify understanding gaps
-- **Remediation Content**: Generate targeted help for specific misconceptions
-- **LangGraph Orchestration**: Coordinate complex LLM workflows for adaptive learning
-- **Interest Integration**: Personalize all content using student interest profiles
+- **Exercise Generation**: Create personalized exercises based on student profiles and interests
+- **Response Evaluation**: Evaluate student responses and identify understanding gaps
+- **Remediation**: Generate targeted remediation content for learning gaps
+- **Vector Context**: **NEW** - Enhanced content generation using Pinecone vector search for relevant educational context
 
-## Architecture
+## 🚀 New Features
 
+### Pinecone Vector Search Integration
+
+The service now integrates with Pinecone vector database to provide:
+
+- **Enhanced Exercise Generation**: Uses relevant educational content from the knowledge base
+- **Context-Aware Evaluation**: More accurate assessment using educational references
+- **Targeted Remediation**: Examples and explanations pulled from similar concepts
+- **Intelligent Fallback**: Gracefully falls back to standard prompts if vector search fails
+
+### Configuration
+
+Add these environment variables for Pinecone integration:
+
+```bash
+# Pinecone Configuration
+PINECONE_API_KEY=your_pinecone_api_key
+PINECONE_INDEX_NAME=spool-content
+PINECONE_ENVIRONMENT=us-east-1-aws
+PINECONE_NAMESPACE=content
+PINECONE_TOP_K=5
+
+# Content Service Integration
+CONTENT_SERVICE_SEARCH_URL=http://localhost:8002/api/content/search
+ENABLE_VECTOR_CONTEXT=true
 ```
-Exercise Request → LangGraph Orchestration → Exercise Generation
-                           ↓
-                  Response Evaluation
-                           ↓
-                    Gap Analysis
-                           ↓
-                 Remediation Generation
+
+### Testing the Integration
+
+Run the integration test:
+
+```bash
+python test_pinecone_integration.py
 ```
+
+This will test all components with and without Pinecone context.
 
 ## Quick Start
 
 ### Prerequisites
 - Python 3.11+
-- Docker
 - OpenAI API key
-- Access to Content Service
-- Access to Student Profile Service
+- Pinecone account (optional but recommended)
+- Content service running (for vector search)
 
-### Local Development
+### Installation
 
 1. Install dependencies:
 ```bash
@@ -48,285 +72,112 @@ cp .env.example .env
 # Edit .env with your values
 ```
 
-3. Run locally:
+3. Run the service:
 ```bash
 uvicorn app.main:app --reload --port 8003
 ```
 
-### Docker
-
-```bash
-# Build
-docker build -t spool-exercise-service .
-
-# Run
-docker run -p 8003:8003 spool-exercise-service
-```
-
 ## API Endpoints
-
-### Health Check
-```
-GET /health
-```
 
 ### Exercise Generation
 ```
 POST /api/exercise/generate
-  - Generate initial exercise for a concept
-  - Body: {
-      "concept_id": "string",
-      "student_id": "string",
-      "student_interests": ["array"],
-      "life_category": "personal|career|social|philanthropic",
-      "difficulty": "basic|intermediate|advanced"
-    }
-
-POST /api/exercise/generate-advanced
-  - Generate advanced exercise after initial completion
-  - Body: {
-      "concept_id": "string",
-      "student_id": "string",
-      "previous_exercise_id": "string"
-    }
 ```
+**Enhanced**: Now includes context from Pinecone vector search
 
-### Exercise Evaluation
+### Response Evaluation
 ```
 POST /api/exercise/evaluate
-  - Evaluate student's thought process explanation
-  - Body: {
-      "exercise_id": "string",
-      "student_response": "string",
-      "student_id": "string"
-    }
-  - Returns: {
-      "evaluation_id": "string",
-      "mastery_achieved": boolean,
-      "competency_map": {
-        "correct_steps": ["array"],
-        "missing_steps": ["array"],
-        "incorrect_steps": ["array"]
-      },
-      "feedback": "string",
-      "needs_remediation": boolean
-    }
 ```
+**Enhanced**: More accurate evaluation using educational context
 
 ### Remediation
 ```
-POST /api/exercise/remediation/generate
-  - Generate targeted remediation for gaps
-  - Body: {
-      "evaluation_id": "string",
-      "focus_gap": "string"
-    }
+POST /api/exercise/remediate
+```
+**Enhanced**: Targeted examples and explanations from knowledge base
 
-GET /api/exercise/remediation/{remediation_id}
-  - Get remediation content
+### Workflow Testing
+```
+POST /api/exercise/workflow
+```
+Complete workflow test with enhanced context
+
+## Architecture
+
+### Enhanced Processing Flow
+
+```
+Student Request → Vector Search → Enhanced Prompt → LLM → Response
+                      ↓
+                 Knowledge Base
+                 (Pinecone)
 ```
 
-### Progress Tracking
-```
-GET /api/exercise/history/{student_id}
-  - Get student's exercise history
+### Fallback Strategy
 
-GET /api/exercise/mastery/{student_id}/{concept_id}
-  - Check mastery status for a concept
-```
-
-## LangGraph Workflows
-
-### Exercise Generation Workflow
-```python
-Start → Extract Concept → Personalize Context → Generate Exercise → Validate → End
-```
-
-### Evaluation Workflow
-```python
-Start → Parse Response → Extract Steps → Compare to Solution → Identify Gaps → Generate Feedback → End
-```
-
-### Remediation Workflow
-```python
-Start → Analyze Gap → Generate Explanation → Create Practice → Validate Understanding → End
-```
-
-## Configuration
-
-### Environment Variables
-- `OPENAI_API_KEY`: OpenAI API key
-- `LANGCHAIN_API_KEY`: LangChain API key (optional)
-- `CONTENT_SERVICE_URL`: URL of content service
-- `PROFILE_SERVICE_URL`: URL of profile service
-- `REDIS_URL`: Redis connection for caching
-- `EVALUATION_MODEL`: Model for evaluation (default: gpt-4o)
-- `GENERATION_MODEL`: Model for generation (default: gpt-4o)
-- `MAX_RETRIES`: Max retries for LLM calls
-- `EXERCISE_CACHE_TTL`: Cache TTL in seconds
-
-## Data Models
-
-### Exercise Structure
-```python
-{
-  "exercise_id": "uuid",
-  "concept_id": "uuid",
-  "student_id": "uuid",
-  "type": "initial|advanced",
-  "content": {
-    "scenario": "string",
-    "problem": "string",
-    "hints": ["array"],
-    "expected_steps": ["array"]
-  },
-  "personalization": {
-    "interests_used": ["array"],
-    "life_category": "string"
-  },
-  "created_at": "datetime"
-}
-```
-
-### Evaluation Structure
-```python
-{
-  "evaluation_id": "uuid",
-  "exercise_id": "uuid",
-  "student_response": "string",
-  "analysis": {
-    "identified_steps": ["array"],
-    "competency_map": {
-      "correct": ["array"],
-      "missing": ["array"],
-      "incorrect": ["array"]
-    },
-    "understanding_score": 0.0-1.0
-  },
-  "mastery_achieved": boolean,
-  "feedback": "string"
-}
-```
-
-### Remediation Structure
-```python
-{
-  "remediation_id": "uuid",
-  "evaluation_id": "uuid",
-  "target_gap": "string",
-  "content": {
-    "explanation": "string",
-    "examples": ["array"],
-    "practice_problems": ["array"]
-  },
-  "personalized_context": "string"
-}
-```
-
-## LangGraph Implementation
-
-### State Management
-```python
-class ExerciseState(TypedDict):
-    concept: dict
-    student_profile: dict
-    exercise_type: str
-    generated_exercise: dict
-    student_response: str
-    evaluation: dict
-    remediation: dict
-```
-
-### Node Functions
-- `fetch_concept`: Get concept from content service
-- `fetch_student_profile`: Get student interests
-- `generate_exercise`: Create personalized exercise
-- `evaluate_response`: Analyze student explanation
-- `identify_gaps`: Find understanding gaps
-- `generate_remediation`: Create targeted help
-
-### Edge Logic
-- Conditional edges based on mastery achievement
-- Retry logic for failed generations
-- Fallback paths for error handling
-
-## Monitoring
-
-### Metrics
-- Exercise generation time
-- Evaluation accuracy
-- Remediation effectiveness
-- Student progress rates
-- LLM token usage
-
-### Logging
-Structured JSON logging with:
-- Exercise generation details
-- Evaluation results
-- Remediation tracking
-- Error analysis
+1. **Primary**: Use enhanced prompts with Pinecone context
+2. **Fallback**: Standard prompts if vector search fails
+3. **Mock**: Test responses if no API keys configured
 
 ## Development
 
-### Testing
+### Running Tests
+
 ```bash
-# Unit tests
-pytest tests/unit
+# Basic tests
+pytest tests/
 
-# Integration tests
-pytest tests/integration
+# Integration test
+python test_pinecone_integration.py
 
-# All tests
-pytest
+# Workflow test
+python comprehensive_workflow_test.py
 ```
 
-### Code Quality
-```bash
-# Linting
-ruff check app
+### Service Dependencies
 
-# Type checking
-mypy app
-
-# Format code
-black app
-```
+- **Content Service**: Provides vector search capabilities
+- **OpenAI API**: For exercise generation and evaluation
+- **Pinecone**: For vector search and context retrieval
 
 ## Deployment
 
-### AWS ECS
-```bash
-# Build and push to ECR
-./scripts/build-and-push.sh
+### Environment Variables
 
-# Deploy to ECS
-./scripts/deploy-ecs.sh
+Production deployment requires:
+
+```bash
+ENVIRONMENT=production
+OPENAI_API_KEY=from_aws_parameter_store
+PINECONE_API_KEY=from_aws_parameter_store
+CONTENT_SERVICE_SEARCH_URL=https://content-service-url/api/content/search
 ```
 
-### Required Resources
-- ECS task with 1GB memory minimum
-- Redis for caching
-- Access to other microservices
+### AWS Parameter Store
 
-## Troubleshooting
+Keys are automatically loaded from AWS Parameter Store in production:
+- `/spool/openai-api-key`
+- `/spool/pinecone-api-key`
 
-### Common Issues
+## Monitoring
 
-1. **Exercise Generation Timeout**
-   - Check OpenAI API limits
-   - Increase timeout settings
-   - Enable caching
+Monitor the enhanced features:
 
-2. **Evaluation Accuracy**
-   - Review prompt templates
-   - Check solution step definitions
-   - Validate competency mapping
+- Vector search success rates
+- Context retrieval latency
+- Fallback activation frequency
+- Enhanced vs standard prompt usage
 
-3. **Remediation Not Helping**
-   - Analyze gap identification
-   - Review personalization logic
-   - Check student profile data
+## Contributing
 
-## License
+When adding new features:
 
-Copyright © 2024 Spool. All rights reserved.
+1. Test with vector context enabled
+2. Ensure graceful fallback to standard prompts
+3. Update integration tests
+4. Document new configuration options
+
+---
+
+**Enhanced with Pinecone Vector Search** - Providing smarter, more contextual educational content generation.

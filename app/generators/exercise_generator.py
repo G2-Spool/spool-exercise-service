@@ -1,13 +1,14 @@
 """Exercise generation using LLMs."""
 
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 import uuid
 from openai import AsyncOpenAI
 import structlog
 
 from app.core.config import settings
+from app.services.pinecone_service import PineconeExerciseService
 
 logger = structlog.get_logger()
 
@@ -18,6 +19,7 @@ class ExerciseGenerator:
     def __init__(self) -> None:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.GENERATION_MODEL
+        self.pinecone_service = PineconeExerciseService()
 
     async def generate(
         self,
@@ -27,8 +29,21 @@ class ExerciseGenerator:
         difficulty: str = "basic",
         exercise_type: str = "initial",
     ) -> Dict[str, Any]:
-        """Generate a personalized exercise."""
+        """Generate a personalized exercise with vector context."""
         try:
+            # Get relevant context from Pinecone
+            context_chunks = await self.pinecone_service.get_concept_context(
+                concept.get("name", ""),
+                student_profile.get("interests", []),
+                difficulty
+            )
+            
+            # Get similar exercises for reference
+            similar_exercises = await self.pinecone_service.find_similar_exercises(
+                concept.get("concept_id", ""),
+                student_profile
+            )
+            
             # Check if using test key or no key - create mock exercise
             if (
                 not settings.OPENAI_API_KEY
@@ -40,9 +55,16 @@ class ExerciseGenerator:
                     concept, student_profile, life_category, difficulty, exercise_type
                 )
 
-            prompt = self._create_generation_prompt(
-                concept, student_profile, life_category, difficulty, exercise_type
-            )
+            # Create enhanced prompt with context if available, otherwise use standard prompt
+            if context_chunks or similar_exercises:
+                prompt = self._create_enhanced_generation_prompt(
+                    concept, student_profile, life_category, difficulty, exercise_type,
+                    context_chunks, similar_exercises
+                )
+            else:
+                prompt = self._create_generation_prompt(
+                    concept, student_profile, life_category, difficulty, exercise_type
+                )
 
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -224,4 +246,66 @@ class ExerciseGenerator:
         
         The exercise should test deep understanding, not just memorization."""
 
+        return prompt
+
+    def _create_enhanced_generation_prompt(
+        self,
+        concept: Dict[str, Any],
+        student_profile: Dict[str, Any],
+        life_category: str,
+        difficulty: str,
+        exercise_type: str,
+        context_chunks: List[Dict[str, Any]],
+        similar_exercises: List[Dict[str, Any]]
+    ) -> str:
+        """Create enhanced prompt with vector context."""
+        interests = student_profile.get("interests", [])
+        
+        # Base prompt
+        prompt = f"""Create a {difficulty} {exercise_type} exercise for this concept:
+        
+        Concept: {concept.get('name')}
+        Content: {concept.get('content', '')}
+        Type: {concept.get('type', 'explanation')}
+        
+        Student Profile:
+        - Interests: {', '.join(interests)}
+        - Grade Level: {student_profile.get('grade_level', 'high school')}
+        - Life Category Focus: {life_category}
+        """
+        
+        # Add context from vector search
+        if context_chunks:
+            prompt += "\n\nRelevant Context from Knowledge Base:\n"
+            for i, chunk in enumerate(context_chunks[:2]):  # Use top 2 chunks
+                content = chunk.get('content', '')
+                if isinstance(content, str):
+                    prompt += f"Context {i+1}: {content[:300]}...\n"
+                else:
+                    prompt += f"Context {i+1}: {str(content)[:300]}...\n"
+        
+        # Add similar exercise patterns
+        if similar_exercises:
+            prompt += "\n\nSimilar Exercise Patterns:\n"
+            for i, exercise in enumerate(similar_exercises[:1]):  # Use 1 example
+                content = exercise.get('content', '')
+                if isinstance(content, str):
+                    prompt += f"Example {i+1}: {content[:200]}...\n"
+                else:
+                    prompt += f"Example {i+1}: {str(content)[:200]}...\n"
+        
+        prompt += f"""
+        Requirements:
+        1. Create a scenario that uses one or more student interests
+        2. Frame it in the context of their {life_category} goals
+        3. Use the provided context to ensure accuracy and depth
+        4. The problem should require explaining their complete thought process
+        5. Difficulty should be {difficulty}
+        6. Include 4-6 expected solution steps
+        7. Provide 2-3 progressive hints
+        
+        {"For an ADVANCED exercise, add additional complexity like multiple concepts, edge cases, or optimization requirements." if exercise_type == "advanced" else ""}
+        
+        The exercise should test deep understanding, not just memorization."""
+        
         return prompt

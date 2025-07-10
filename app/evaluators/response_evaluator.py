@@ -1,13 +1,14 @@
 """Evaluate student responses to identify understanding gaps."""
 
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 import uuid
 from openai import AsyncOpenAI
 import structlog
 
 from app.core.config import settings
+from app.services.pinecone_service import PineconeExerciseService
 
 logger = structlog.get_logger()
 
@@ -18,12 +19,20 @@ class ResponseEvaluator:
     def __init__(self) -> None:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.EVALUATION_MODEL
+        self.pinecone_service = PineconeExerciseService()
 
     async def evaluate(
         self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Evaluate a student's response to an exercise."""
+        """Evaluate a student's response with enhanced context."""
         try:
+            # Get concept context for better evaluation
+            context_chunks = await self.pinecone_service.get_concept_context(
+                concept.get("name", ""),
+                [],  # No interests needed for evaluation
+                "basic"
+            )
+            
             # Validate response length
             if len(student_response) < settings.MIN_RESPONSE_LENGTH:
                 return self._create_insufficient_response_evaluation(
@@ -39,7 +48,13 @@ class ResponseEvaluator:
             ):
                 return self._create_mock_evaluation(exercise, student_response, concept)
 
-            prompt = self._create_evaluation_prompt(exercise, student_response, concept)
+            # Create enhanced prompt with context if available, otherwise use standard prompt
+            if context_chunks:
+                prompt = self._create_enhanced_evaluation_prompt(
+                    exercise, student_response, concept, context_chunks
+                )
+            else:
+                prompt = self._create_evaluation_prompt(exercise, student_response, concept)
 
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -249,6 +264,54 @@ class ResponseEvaluator:
         Score their overall understanding from 0.0 to 1.0.
         Mastery is achieved ONLY if they explain ALL key steps correctly."""
 
+        return prompt
+
+    def _create_enhanced_evaluation_prompt(
+        self,
+        exercise: Dict[str, Any],
+        student_response: str,
+        concept: Dict[str, Any],
+        context_chunks: List[Dict[str, Any]]
+    ) -> str:
+        """Create enhanced evaluation prompt with context."""
+        expected_steps = exercise.get("expected_steps", [])
+        
+        prompt = f"""Evaluate this student's response to an exercise:
+        
+        Concept Being Tested: {concept.get('name')}
+        
+        Exercise Scenario: {exercise.get('content', {}).get('scenario')}
+        Exercise Problem: {exercise.get('content', {}).get('problem')}
+        
+        Expected Solution Steps:
+        {chr(10).join(f"{i+1}. {step}" for i, step in enumerate(expected_steps))}
+        
+        Student's Response:
+        "{student_response}"
+        """
+        
+        # Add context for more accurate evaluation
+        if context_chunks:
+            prompt += "\n\nAdditional Context for Evaluation:\n"
+            for i, chunk in enumerate(context_chunks[:2]):
+                content = chunk.get('content', '')
+                if isinstance(content, str):
+                    prompt += f"Context {i+1}: {content[:300]}...\n"
+                else:
+                    prompt += f"Context {i+1}: {str(content)[:300]}...\n"
+        
+        prompt += """
+        Evaluation Criteria:
+        1. Has the student demonstrated understanding of each expected step?
+        2. Is their reasoning logically sound?
+        3. Did they identify the key concepts?
+        4. Are there any misconceptions or knowledge gaps?
+        5. Is the explanation complete and clear?
+        6. Use the provided context to verify accuracy
+        
+        Score their overall understanding from 0.0 to 1.0.
+        Mastery is achieved ONLY if they explain ALL key steps correctly."""
+        
         return prompt
 
     def _create_insufficient_response_evaluation(

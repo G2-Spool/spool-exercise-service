@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     PROFILE_SERVICE_URL: str = "http://localhost:8004"
     API_GATEWAY_URL: str = "http://localhost:8000"
 
+    # Pinecone Configuration
+    PINECONE_API_KEY: str = Field(default="")
+    PINECONE_INDEX_NAME: str = "spool-content"
+    PINECONE_ENVIRONMENT: str = "us-east-1-aws"
+    PINECONE_NAMESPACE: str = "content"
+    PINECONE_TOP_K: int = 5
+
+    # Content Service Integration
+    CONTENT_SERVICE_SEARCH_URL: str = "http://localhost:8002/api/content/search"
+    ENABLE_VECTOR_CONTEXT: bool = True
+
     # Redis Cache
     REDIS_URL: str = "redis://localhost:6379"
     CACHE_TTL: int = 3600  # 1 hour
@@ -115,6 +126,14 @@ class Settings(BaseSettings):
                 logger.info("Loaded OpenAI API key from AWS Parameter Store")
             else:
                 logger.error("Failed to load OpenAI API key from AWS Parameter Store")
+
+            # Load Pinecone API key from AWS Parameter Store
+            pinecone_key = aws_params.get_parameter("/spool/pinecone-api-key")
+            if pinecone_key:
+                self.PINECONE_API_KEY = pinecone_key
+                logger.info("Loaded Pinecone API key from AWS Parameter Store")
+            else:
+                logger.warning("Pinecone API key not found in AWS Parameter Store")
 
         except Exception as e:
             logger.error("Failed to load production secrets", error=str(e))
