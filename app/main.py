@@ -1,6 +1,7 @@
 """Main FastAPI application for Exercise Service."""
 
 from contextlib import asynccontextmanager
+from typing import Dict, Any, AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +21,7 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle manager."""
     # Startup
     logger.info("Starting Spool Exercise Service", version=settings.APP_VERSION)
@@ -76,7 +77,7 @@ app.include_router(
 
 
 @app.get("/", tags=["root"])
-async def root():
+async def root() -> Dict[str, Any]:
     """Root endpoint."""
     return {
         "service": "Spool Exercise Service",
@@ -87,7 +88,7 @@ async def root():
 
 
 @app.get("/health", tags=["health"])
-async def health_check(request: Request):
+async def health_check(request: Request) -> JSONResponse:
     """Health check endpoint."""
     health_status = {
         "status": "healthy",
@@ -120,7 +121,7 @@ async def health_check(request: Request):
 
 
 @app.get("/config", tags=["debug"])
-async def get_config():
+async def get_config() -> Dict[str, Any] | JSONResponse:
     """Get current configuration (development only)."""
     if settings.ENVIRONMENT == "production":
         return JSONResponse(

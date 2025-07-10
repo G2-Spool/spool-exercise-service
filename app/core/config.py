@@ -1,6 +1,6 @@
 """Configuration management for Exercise Service."""
 
-from typing import List, Optional
+from typing import List, Optional, Any
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -70,13 +70,17 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = Field(default_factory=list)
 
     @field_validator("CORS_ORIGINS", mode="before")
-    def parse_cors_origins(cls, v):
+    @classmethod
+    def parse_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str):
             try:
-                return json.loads(v)
+                parsed = json.loads(v)
+                return list(parsed) if isinstance(parsed, list) else [str(parsed)]
             except json.JSONDecodeError:
                 return [origin.strip() for origin in v.split(",")]
-        return v
+        if isinstance(v, list):
+            return [str(item) for item in v]
+        return []
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = True
@@ -94,7 +98,7 @@ class Settings(BaseSettings):
         """Check if running in development."""
         return self.ENVIRONMENT == "development"
 
-    def load_production_secrets(self):
+    def load_production_secrets(self) -> None:
         """Load secrets from AWS Parameter Store for production."""
         if not self.is_production():
             return
@@ -116,7 +120,7 @@ class Settings(BaseSettings):
             logger.error("Failed to load production secrets", error=str(e))
             raise
 
-    def validate_configuration(self):
+    def validate_configuration(self) -> None:
         """Validate configuration based on environment."""
         if self.is_production():
             if not self.OPENAI_API_KEY or self.OPENAI_API_KEY.startswith("test"):

@@ -1,6 +1,7 @@
 """Structured logging configuration."""
 
 import sys
+from typing import Any
 import structlog
 from structlog.processors import JSONRenderer, TimeStamper, add_log_level
 from structlog.stdlib import add_logger_name
@@ -8,10 +9,11 @@ from structlog.stdlib import add_logger_name
 from app.core.config import settings
 
 
-def setup_logging():
+def setup_logging() -> None:
     """Configure structured logging."""
 
     # Determine renderer based on environment
+    renderer: Any
     if settings.LOG_FORMAT == "json":
         renderer = JSONRenderer()
     else:

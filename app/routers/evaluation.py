@@ -1,6 +1,7 @@
 """Exercise evaluation routes."""
 
 import json
+from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Request
 import structlog
 
@@ -13,7 +14,9 @@ logger = structlog.get_logger()
 
 
 @router.post("/evaluate", response_model=EvaluateResponse)
-async def evaluate_response(response_data: StudentResponse, request: Request):
+async def evaluate_response(
+    response_data: StudentResponse, request: Request
+) -> EvaluateResponse:
     """Evaluate a student's response to an exercise."""
     try:
         # Get exercise from cache
@@ -104,7 +107,7 @@ async def evaluate_response(response_data: StudentResponse, request: Request):
 
 
 @router.get("/evaluation/{evaluation_id}")
-async def get_evaluation(evaluation_id: str, request: Request):
+async def get_evaluation(evaluation_id: str, request: Request) -> Dict[str, Any]:
     """Get evaluation details."""
     try:
         cache = request.app.state.redis_cache
@@ -113,7 +116,7 @@ async def get_evaluation(evaluation_id: str, request: Request):
         if not eval_data:
             raise HTTPException(status_code=404, detail="Evaluation not found")
 
-        return json.loads(eval_data)
+        return dict(json.loads(eval_data))
 
     except HTTPException:
         raise

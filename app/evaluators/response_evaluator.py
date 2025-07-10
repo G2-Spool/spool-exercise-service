@@ -15,7 +15,7 @@ logger = structlog.get_logger()
 class ResponseEvaluator:
     """Evaluate student responses using LLMs."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.EVALUATION_MODEL
 
@@ -51,7 +51,10 @@ class ResponseEvaluator:
                 response_format={"type": "json_object"},
             )
 
-            evaluation_result = json.loads(response.choices[0].message.content)
+            content = response.choices[0].message.content
+            if content is None:
+                raise ValueError("Empty response from OpenAI API")
+            evaluation_result = json.loads(content)
 
             # Create evaluation object
             evaluation = {

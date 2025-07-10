@@ -15,12 +15,12 @@ logger = structlog.get_logger()
 class ExerciseWorkflow:
     """Main workflow for exercise generation and evaluation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes = WorkflowNodes()
         self.graph = self._build_graph()
         self.memory = MemorySaver()
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> Any:
         """Build the exercise workflow graph."""
         workflow = StateGraph(ExerciseState)
 

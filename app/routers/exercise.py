@@ -13,6 +13,8 @@ from app.models.exercise import (
     Exercise,
     ExerciseHistory,
     MasteryStatus,
+    ExerciseType,
+    DifficultyLevel,
 )
 from app.langgraph.workflows import ExerciseWorkflow
 
@@ -21,7 +23,9 @@ logger = structlog.get_logger()
 
 
 @router.post("/generate", response_model=GenerateExerciseResponse)
-async def generate_exercise(request_data: ExerciseGenerationRequest, request: Request):
+async def generate_exercise(
+    request_data: ExerciseGenerationRequest, request: Request
+) -> GenerateExerciseResponse:
     """Generate a personalized exercise for a concept."""
     try:
         workflow: ExerciseWorkflow = request.app.state.workflow
@@ -47,8 +51,8 @@ async def generate_exercise(request_data: ExerciseGenerationRequest, request: Re
             exercise_id=exercise_data["exercise_id"],
             concept_id=exercise_data["concept_id"],
             student_id=exercise_data["student_id"],
-            type=exercise_data["type"],
-            difficulty=exercise_data["difficulty"],
+            type=ExerciseType(exercise_data["type"]),
+            difficulty=DifficultyLevel(exercise_data["difficulty"]),
             content=exercise_data["content"],
             personalization=exercise_data["personalization"],
             expected_steps=exercise_data["expected_steps"],
@@ -78,7 +82,9 @@ async def generate_exercise(request_data: ExerciseGenerationRequest, request: Re
 
 
 @router.post("/generate-advanced", response_model=GenerateExerciseResponse)
-async def generate_advanced_exercise(request_data: Dict[str, Any], request: Request):
+async def generate_advanced_exercise(
+    request_data: Dict[str, Any], request: Request
+) -> GenerateExerciseResponse:
     """Generate an advanced exercise after initial completion."""
     try:
         # Get original exercise from cache
@@ -116,8 +122,8 @@ async def generate_advanced_exercise(request_data: Dict[str, Any], request: Requ
             exercise_id=exercise_data["exercise_id"],
             concept_id=exercise_data["concept_id"],
             student_id=exercise_data["student_id"],
-            type="advanced",
-            difficulty="advanced",
+            type=ExerciseType.ADVANCED,
+            difficulty=DifficultyLevel.ADVANCED,
             content=exercise_data["content"],
             personalization=exercise_data["personalization"],
             expected_steps=exercise_data["expected_steps"],
@@ -147,7 +153,7 @@ async def generate_advanced_exercise(request_data: Dict[str, Any], request: Requ
 @router.get("/history/{student_id}", response_model=List[ExerciseHistory])
 async def get_exercise_history(
     student_id: str, request: Request, concept_id: Optional[str] = None
-):
+) -> List[ExerciseHistory]:
     """Get student's exercise history."""
     try:
         # In production, this would query a database
@@ -160,7 +166,9 @@ async def get_exercise_history(
 
 
 @router.get("/mastery/{student_id}/{concept_id}")
-async def check_mastery_status(student_id: str, concept_id: str, request: Request):
+async def check_mastery_status(
+    student_id: str, concept_id: str, request: Request
+) -> Dict[str, Any]:
     """Check mastery status for a concept."""
     try:
         # In production, this would check the database

@@ -14,7 +14,7 @@ _redis_cache: Optional[Cache] = None
 _http_client: Optional[httpx.AsyncClient] = None
 
 
-async def get_redis_cache():
+async def get_redis_cache() -> Cache:
     """Get Redis cache instance."""
     global _redis_cache
 

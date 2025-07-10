@@ -15,7 +15,7 @@ logger = structlog.get_logger()
 class WorkflowNodes:
     """Collection of node functions for exercise workflows."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.exercise_gen = ExerciseGenerator()
         self.evaluator = ResponseEvaluator()
         self.remediation_gen = RemediationGenerator()

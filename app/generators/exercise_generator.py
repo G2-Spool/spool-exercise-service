@@ -15,7 +15,7 @@ logger = structlog.get_logger()
 class ExerciseGenerator:
     """Generate personalized exercises using LLMs."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.GENERATION_MODEL
 
@@ -55,7 +55,10 @@ class ExerciseGenerator:
                 response_format={"type": "json_object"},
             )
 
-            exercise_content = json.loads(response.choices[0].message.content)
+            content = response.choices[0].message.content
+            if content is None:
+                raise ValueError("Empty response from OpenAI API")
+            exercise_content = json.loads(content)
 
             # Create exercise object
             exercise = {

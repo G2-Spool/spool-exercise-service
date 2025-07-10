@@ -1,7 +1,7 @@
 """AWS configuration utilities for production deployment."""
 
 import boto3
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import structlog
 from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
 
@@ -17,7 +17,7 @@ class AWSParameterStore:
         self._client = None
 
     @property
-    def client(self):
+    def client(self) -> Any:
         """Lazy initialization of SSM client."""
         if self._client is None:
             try:
@@ -49,7 +49,7 @@ class AWSParameterStore:
                 parameter_name=parameter_name,
                 value_length=len(value) if value else 0,
             )
-            return value
+            return str(value) if value is not None else None
 
         except ClientError as e:
             error_code = e.response["Error"]["Code"]

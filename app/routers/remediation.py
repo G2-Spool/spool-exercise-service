@@ -11,7 +11,9 @@ logger = structlog.get_logger()
 
 
 @router.post("/generate")
-async def generate_remediation(request_data: Dict[str, Any], request: Request):
+async def generate_remediation(
+    request_data: Dict[str, Any], request: Request
+) -> Dict[str, Any]:
     """Generate remediation for a specific gap."""
     try:
         evaluation_id = request_data.get("evaluation_id")
@@ -21,7 +23,7 @@ async def generate_remediation(request_data: Dict[str, Any], request: Request):
         remediation_data = await cache.get(f"remediation:{evaluation_id}")
 
         if remediation_data:
-            return json.loads(remediation_data)
+            return dict(json.loads(remediation_data))
 
         # Get evaluation data
         eval_data = await cache.get(f"evaluation:{evaluation_id}")
@@ -47,7 +49,7 @@ async def generate_remediation(request_data: Dict[str, Any], request: Request):
 
 
 @router.get("/{remediation_id}")
-async def get_remediation(remediation_id: str, request: Request):
+async def get_remediation(remediation_id: str, request: Request) -> Dict[str, Any]:
     """Get remediation content."""
     try:
         # Try by remediation ID first
@@ -61,7 +63,7 @@ async def get_remediation(remediation_id: str, request: Request):
         if not remediation_data:
             raise HTTPException(status_code=404, detail="Remediation not found")
 
-        return json.loads(remediation_data)
+        return dict(json.loads(remediation_data))
 
     except HTTPException:
         raise
@@ -73,7 +75,7 @@ async def get_remediation(remediation_id: str, request: Request):
 @router.post("/complete/{remediation_id}")
 async def mark_remediation_complete(
     remediation_id: str, request_data: Dict[str, Any], request: Request
-):
+) -> Dict[str, Any]:
     """Mark remediation as completed."""
     try:
         student_id = request_data.get("student_id")
