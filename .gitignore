@@ -48,7 +48,7 @@ env/
 htmlcov/
 .tox/
 .hypothesis/
-**/scripts/test_results/
+**/test_results/
 
 # Logs
 *.log
