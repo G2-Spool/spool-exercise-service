@@ -159,12 +159,18 @@ class RemediationGenerator:
         generating targeted remediation content for specific learning gaps.
         
         Your remediation should:
-        1. Address the specific gap identified in the evaluation
-        2. Break down complex concepts into manageable steps
-        3. Provide clear explanations with examples
-        4. Include practice problems at an appropriate level
-        5. Connect to the student's interests and context
-        6. Build confidence while addressing misconceptions
+        1. Reframe the gap as an opportunity for expanded enactment within 
+            their assemblage of interests, tools, and contexts
+        2. Break down complex concepts into manageable steps as aligned with their
+            attempted solution as is reasonable
+        3. Provide clear explanations with various examples that match the correct
+            solution path
+        4. Include practice opportunities that strengthen performance within their
+            assemblage of interests, tools, and contexts
+        5. Connect new performances to their existing ways of engaging with the
+            student's interests and context
+        6. Build confidence by validating current performances and expanding their
+            repertoire while addressing misconceptions and assemblage gaps
         
         Return your response as a JSON object with these fields:
         - explanation: Clear explanation of the concept/gap

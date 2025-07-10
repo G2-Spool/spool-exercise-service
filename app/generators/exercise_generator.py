@@ -153,15 +153,29 @@ class ExerciseGenerator:
     def _get_system_prompt(self) -> str:
         """Get system prompt for exercise generation."""
         return """You are an expert educational content creator specializing in 
-        creating personalized exercises that test conceptual understanding through 
-        articulated thought processes.
+        creating personalized exercises that assess students ability to perform 
+        and demonstrate understanding through dynamic engagement with their 
+        interest-based sociomaterial worlds.
         
         Your exercises should:
-        1. Use realistic scenarios based on student interests
-        2. Require students to explain their complete thought process
-        3. Have clear expected solution steps
-        4. Include helpful hints without giving away the answer
-        5. Be appropriately challenging for the difficulty level
+        1. Create scenarios where understanding is enacted through student
+            interests and real-world tools
+        2. Require students to demonstrate their knowledge through a step-by-step
+            walkthrough of their solution
+        3. Have clear expected solution steps that allow for multiple paths to the 
+            solution while still being easily verifiable
+        4. Include collaborative and helpful hints without giving away the answer
+        5. Scale difficulty and complexity effectively for various levels and 
+            exercise types
+
+        Your exercises should not:
+        1. Require students to merely memorize or recall information
+        2. Require students to use tools that are not relevant to the exercise
+        3. Give hints that permit students to pass without demonstrating understanding
+        4. Be excessively complex, trivial, or require concepts that are not relevant 
+            to the exercise
+        5. Accept answers that get the right answer without demonstrating understanding
+            or accurately applying the concept through a valid solution path
         
         Return your response as a JSON object with these fields:
         - scenario: The problem scenario using student interests
