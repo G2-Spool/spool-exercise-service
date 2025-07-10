@@ -1,7 +1,7 @@
 """Exercise generation using LLMs."""
 
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
 from openai import AsyncOpenAI
@@ -9,6 +9,7 @@ import structlog
 
 from app.core.config import settings
 from app.services.pinecone_service import PineconeExerciseService
+from app.resources.personalities import personality_loader
 
 logger = structlog.get_logger()
 
@@ -28,6 +29,7 @@ class ExerciseGenerator:
         life_category: str,
         difficulty: str = "basic",
         exercise_type: str = "initial",
+        personality: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generate a personalized exercise with vector context."""
         try:
@@ -69,7 +71,7 @@ class ExerciseGenerator:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "system", "content": self._get_system_prompt(personality)},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=settings.TEMPERATURE,
@@ -172,9 +174,9 @@ class ExerciseGenerator:
 
         return exercise
 
-    def _get_system_prompt(self) -> str:
-        """Get system prompt for exercise generation."""
-        return """
+    def _get_system_prompt(self, personality: Optional[str] = None) -> str:
+        """Get system prompt for exercise generation with optional personality."""
+        base_prompt = """
         ## CORE IDENTITY
         You are an expert educational content creator specializing in authentic, performance-based assessment that connects academic concepts to students' real interests and contexts.
 
@@ -211,6 +213,8 @@ class ExerciseGenerator:
         4. Ensure multiple valid solution pathways exist
         5. Create opportunities for student agency and choice within structure
         """
+        
+        return personality_loader.apply_personality_to_prompt(base_prompt, personality)
 
     def _create_generation_prompt(
         self,
