@@ -218,15 +218,7 @@ class ResponseEvaluator:
         3. Connect evaluation to learning objectives and expected outcomes
         4. Generate specific, actionable feedback for improvement
         5. Consider multiple valid approaches while maintaining rigor
-        
-        Return your response as a JSON object with these fields:
-        - correct_steps: Array of correctly explained steps
-        - missing_steps: Array of steps not addressed
-        - incorrect_steps: Array of incorrectly explained steps
-        - partial_steps: Array of {step, issue} for partially correct steps
-        - understanding_score: Float 0.0 to 1.0
-        - mastery_achieved: Boolean (true only if ALL key steps are explained)
-        - feedback: Constructive feedback message"""
+        """
 
     def _create_evaluation_prompt(
         self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any]

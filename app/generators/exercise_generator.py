@@ -188,14 +188,7 @@ class ExerciseGenerator:
         3. Map cognitive load and chunk information appropriately
         4. Ensure multiple valid solution pathways exist
         5. Create opportunities for student agency and choice within structure
-        
-        Return your response as a JSON object with these fields:
-        - scenario: The problem scenario using student interests
-        - problem: The specific question or task
-        - expected_steps: Array of logical steps in the solution
-        - hints: Array of 2-3 progressive hints
-        - personalized_context: How this relates to their interests
-        - success_criteria: What constitutes a correct solution"""
+        """
 
     def _create_generation_prompt(
         self,

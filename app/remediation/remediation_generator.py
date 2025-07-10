@@ -191,14 +191,6 @@ class RemediationGenerator:
         3. Create multiple practice opportunities with spaced repetition
         4. Ensure authentic connection to student interests and contexts
         5. Include metacognitive reflection and self-assessment opportunities
-        
-        Return your response as a JSON object with these fields:
-        - explanation: Clear explanation of the concept/gap
-        - step_by_step_guide: Array of specific steps to follow
-        - examples: Array of worked examples
-        - practice_problems: Array of practice problems
-        - personalized_context: How this connects to student interests
-        - key_insights: Most important takeaways
         """
 
     def _create_remediation_prompt(
