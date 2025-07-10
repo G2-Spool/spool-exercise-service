@@ -38,7 +38,12 @@ from app.models.exercise import (
     DifficultyLevel,
     ExerciseType,
 )
-from app.langgraph.workflows import ExerciseWorkflow
+try:
+    from app.langgraph.workflows import ExerciseWorkflow
+    WORKFLOW_AVAILABLE = True
+except ImportError:
+    WORKFLOW_AVAILABLE = False
+    
 from app.generators.exercise_generator import ExerciseGenerator
 from app.evaluators.response_evaluator import ResponseEvaluator
 from app.remediation.remediation_generator import RemediationGenerator
@@ -60,7 +65,11 @@ class RealAPIWorkflowTester:
         self.generator = ExerciseGenerator()
         self.evaluator = ResponseEvaluator()
         self.remediation_gen = RemediationGenerator()
-        self.workflow = ExerciseWorkflow()
+        if WORKFLOW_AVAILABLE:
+            self.workflow = ExerciseWorkflow()
+        else:
+            self.workflow = None
+            print("⚠️  LangGraph workflow not available - using direct component testing")
         self.test_results = []
         self.output_dir = "test_results"
         

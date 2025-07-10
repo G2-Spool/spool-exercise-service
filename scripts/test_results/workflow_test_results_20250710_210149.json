@@ -1,0 +1,440 @@
+[
+  {
+    "scenario": {
+      "name": "Perfect Student",
+      "description": "Student who succeeds flawlessly",
+      "student_id": "perfect_student_001",
+      "interests": [
+        "sports",
+        "music",
+        "technology"
+      ],
+      "grade_level": "high school",
+      "response_type": "perfect"
+    },
+    "result": {
+      "scenario_name": "Perfect Student",
+      "concept": {
+        "concept_id": "quadratic_equations_001",
+        "name": "Quadratic Equations",
+        "content": "Equations of the form ax\u00b2 + bx + c = 0, where a \u2260 0",
+        "type": "mathematical_concept",
+        "difficulty": "intermediate",
+        "learning_objectives": [
+          "Understand standard form of quadratic equations",
+          "Apply factoring method when possible",
+          "Use quadratic formula for all cases",
+          "Verify solutions by substitution"
+        ]
+      },
+      "student_profile": {
+        "student_id": "perfect_student_001",
+        "interests": [
+          "sports",
+          "music",
+          "technology"
+        ],
+        "grade_level": "high school"
+      },
+      "exercise": {
+        "exercise_id": "d2982602-ccd8-4867-8642-2b23ff040c66",
+        "concept_id": "quadratic_equations_001",
+        "student_id": "perfect_student_001",
+        "type": "initial",
+        "difficulty": "basic",
+        "content": {
+          "scenario": "Imagine you're part of a technology club at your high school, and you're developing a music app that uses mathematical algorithms to create custom playlists. One of the features you want to add is the ability to adjust the volume of different tracks based on user preferences, which follow a quadratic pattern. To perfect this feature, you need to solve a quadratic equation that models the volume changes.",
+          "problem": "Suppose the volume changes are modeled by the equation 2x\u00b2 - 4x - 6 = 0. Your task is to solve this equation to find the values of x, which represent the optimal volume adjustments for the music tracks.",
+          "expected_steps": [
+            "Step 1: Identify the coefficients in the quadratic equation, where a = 2, b = -4, and c = -6.",
+            "Step 2: Use the quadratic formula, x = [-b \u00b1 \u221a(b\u00b2 - 4ac)] / 2a, to find the solutions for x.",
+            "Step 3: Calculate the discriminant, b\u00b2 - 4ac = (-4)\u00b2 - 4(2)(-6), to determine the nature of the roots.",
+            "Step 4: Substitute the values of a, b, and c into the quadratic formula and simplify to find the solutions for x.",
+            "Step 5: Solve for x to obtain the two possible values for the volume adjustments."
+          ],
+          "success_criteria": "Successful completion of the exercise involves correctly applying the quadratic formula to find both solutions for x, demonstrating an understanding of each step involved in the process.",
+          "cognitive_scaffolds": [
+            "Break down the quadratic formula to understand each part's role in solving the equation.",
+            "Check each calculation step to ensure accuracy, especially when substituting values and simplifying expressions.",
+            "Review the concept of the discriminant to understand why it determines the nature of the roots."
+          ],
+          "metacognitive_prompts": [
+            "How did identifying the coefficients help you in solving the equation?",
+            "What role does the discriminant play in determining the nature of the solutions?",
+            "Reflect on the process you followed: What did you find challenging, and how did you overcome it?"
+          ]
+        },
+        "personalization": {
+          "interests_used": [
+            "sports",
+            "music",
+            "technology"
+          ],
+          "life_category": "academic",
+          "context": null
+        },
+        "expected_steps": [
+          "Step 1: Identify the coefficients in the quadratic equation, where a = 2, b = -4, and c = -6.",
+          "Step 2: Use the quadratic formula, x = [-b \u00b1 \u221a(b\u00b2 - 4ac)] / 2a, to find the solutions for x.",
+          "Step 3: Calculate the discriminant, b\u00b2 - 4ac = (-4)\u00b2 - 4(2)(-6), to determine the nature of the roots.",
+          "Step 4: Substitute the values of a, b, and c into the quadratic formula and simplify to find the solutions for x.",
+          "Step 5: Solve for x to obtain the two possible values for the volume adjustments."
+        ],
+        "hints": [],
+        "created_at": "2025-07-10T20:59:55.544247"
+      },
+      "student_response": "\n            Looking at this problem, I need to identify that this is a quadratic equation and solve it systematically.\n            \n            The equation is in the form ax\u00b2 + bx + c = 0, so I can use the quadratic formula: x = (-b \u00b1 \u221a(b\u00b2 - 4ac)) / 2a\n            \n            First, let me identify the coefficients:\n            a = 1, b = 5, c = 6\n            \n            Now I'll apply the quadratic formula:\n            x = (-5 \u00b1 \u221a(25 - 24)) / 2\n            x = (-5 \u00b1 \u221a1) / 2\n            x = (-5 \u00b1 1) / 2\n            \n            This gives me two solutions:\n            x\u2081 = (-5 + 1) / 2 = -4/2 = -2\n            x\u2082 = (-5 - 1) / 2 = -6/2 = -3\n            \n            Let me verify by substituting back:\n            For x = -2: (-2)\u00b2 + 5(-2) + 6 = 4 - 10 + 6 = 0 \u2713\n            For x = -3: (-3)\u00b2 + 5(-3) + 6 = 9 - 15 + 6 = 0 \u2713\n            \n            Therefore, the solutions are x = -2 and x = -3.\n            ",
+      "evaluation": {
+        "evaluation_id": "4a0130b1-cb35-41ea-ad69-c7c02afa50ab",
+        "exercise_id": "d2982602-ccd8-4867-8642-2b23ff040c66",
+        "student_response": "\n            Looking at this problem, I need to identify that this is a quadratic equation and solve it systematically.\n            \n            The equation is in the form ax\u00b2 + bx + c = 0, so I can use the quadratic formula: x = (-b \u00b1 \u221a(b\u00b2 - 4ac)) / 2a\n            \n            First, let me identify the coefficients:\n            a = 1, b = 5, c = 6\n            \n            Now I'll apply the quadratic formula:\n            x = (-5 \u00b1 \u221a(25 - 24)) / 2\n            x = (-5 \u00b1 \u221a1) / 2\n            x = (-5 \u00b1 1) / 2\n            \n            This gives me two solutions:\n            x\u2081 = (-5 + 1) / 2 = -4/2 = -2\n            x\u2082 = (-5 - 1) / 2 = -6/2 = -3\n            \n            Let me verify by substituting back:\n            For x = -2: (-2)\u00b2 + 5(-2) + 6 = 4 - 10 + 6 = 0 \u2713\n            For x = -3: (-3)\u00b2 + 5(-3) + 6 = 9 - 15 + 6 = 0 \u2713\n            \n            Therefore, the solutions are x = -2 and x = -3.\n            ",
+        "competency_map": {
+          "correct_steps": [],
+          "missing_steps": [],
+          "incorrect_steps": [],
+          "partial_steps": []
+        },
+        "understanding_score": 0.0,
+        "mastery_achieved": false,
+        "feedback": "",
+        "needs_remediation": false,
+        "evaluated_at": "2025-07-10T21:00:04.456215"
+      },
+      "remediation": null,
+      "workflow_completed": true,
+      "total_steps": 4
+    },
+    "timestamp": "2025-07-10T21:00:04.456421",
+    "success": true
+  },
+  {
+    "scenario": {
+      "name": "Good Student",
+      "description": "Student with good understanding but makes mistakes",
+      "student_id": "good_student_002",
+      "interests": [
+        "art",
+        "science",
+        "gaming"
+      ],
+      "grade_level": "high school",
+      "response_type": "good_with_mistakes"
+    },
+    "result": {
+      "scenario_name": "Good Student",
+      "concept": {
+        "concept_id": "quadratic_equations_001",
+        "name": "Quadratic Equations",
+        "content": "Equations of the form ax\u00b2 + bx + c = 0, where a \u2260 0",
+        "type": "mathematical_concept",
+        "difficulty": "intermediate",
+        "learning_objectives": [
+          "Understand standard form of quadratic equations",
+          "Apply factoring method when possible",
+          "Use quadratic formula for all cases",
+          "Verify solutions by substitution"
+        ]
+      },
+      "student_profile": {
+        "student_id": "good_student_002",
+        "interests": [
+          "art",
+          "science",
+          "gaming"
+        ],
+        "grade_level": "high school"
+      },
+      "exercise": {
+        "exercise_id": "799d87de-fb53-400b-8346-f61f9963adc3",
+        "concept_id": "quadratic_equations_001",
+        "student_id": "good_student_002",
+        "type": "initial",
+        "difficulty": "basic",
+        "content": {
+          "scenario": "Imagine you're designing a video game where players must solve puzzles to advance. One of the puzzles involves unlocking a door with a code that is determined by solving a quadratic equation painted as a mural on the wall. Your task is to decipher the mural's equation to find the correct code and help the player progress in the game.",
+          "problem": "The mural shows the equation 2x\u00b2 + 3x - 5 = 0. Solve this equation to find the values of x, which represent the code needed to unlock the door.",
+          "expected_steps": [
+            "1. Identify the quadratic equation: 2x\u00b2 + 3x - 5 = 0.",
+            "2. Use the quadratic formula x = [-b \u00b1 \u221a(b\u00b2 - 4ac)] / 2a, where a = 2, b = 3, and c = -5.",
+            "3. Calculate the discriminant (b\u00b2 - 4ac): 3\u00b2 - 4(2)(-5) = 9 + 40 = 49.",
+            "4. Substitute the values into the quadratic formula: x = [-3 \u00b1 \u221a49] / 4.",
+            "5. Solve the equation for both solutions: x = (-3 + 7) / 4 and x = (-3 - 7) / 4.",
+            "6. Simplify the solutions: x = 1 and x = -2.5."
+          ],
+          "success_criteria": "Correctly apply the quadratic formula to find the values of x, demonstrating each calculation step clearly and accurately. The final answers should be x = 1 and x = -2.5.",
+          "cognitive_scaffolds": [
+            "Break down the quadratic formula into manageable parts and focus on calculating each component separately.",
+            "Check each calculation step for accuracy before moving to the next step.",
+            "Visualize the problem as part of the game scenario to maintain interest and motivation."
+          ],
+          "metacognitive_prompts": [
+            "What part of the quadratic formula do you find most challenging, and why?",
+            "How can visualizing the problem as part of a game help you understand the steps better?",
+            "Which steps did you find straightforward, and which required more thought? Why?"
+          ]
+        },
+        "personalization": {
+          "interests_used": [
+            "art",
+            "science",
+            "gaming"
+          ],
+          "life_category": "academic",
+          "context": null
+        },
+        "expected_steps": [
+          "1. Identify the quadratic equation: 2x\u00b2 + 3x - 5 = 0.",
+          "2. Use the quadratic formula x = [-b \u00b1 \u221a(b\u00b2 - 4ac)] / 2a, where a = 2, b = 3, and c = -5.",
+          "3. Calculate the discriminant (b\u00b2 - 4ac): 3\u00b2 - 4(2)(-5) = 9 + 40 = 49.",
+          "4. Substitute the values into the quadratic formula: x = [-3 \u00b1 \u221a49] / 4.",
+          "5. Solve the equation for both solutions: x = (-3 + 7) / 4 and x = (-3 - 7) / 4.",
+          "6. Simplify the solutions: x = 1 and x = -2.5."
+        ],
+        "hints": [],
+        "created_at": "2025-07-10T21:00:17.510138"
+      },
+      "student_response": "\n            This is a quadratic equation, so I need to solve it using the quadratic formula.\n            \n            The equation is ax\u00b2 + bx + c = 0, where a = 1, b = 5, c = 6\n            \n            Using the quadratic formula: x = (-b \u00b1 \u221a(b\u00b2 - 4ac)) / 2a\n            \n            x = (-5 \u00b1 \u221a(25 - 24)) / 2\n            x = (-5 \u00b1 \u221a1) / 2\n            x = (-5 \u00b1 1) / 2\n            \n            So x = -4/2 = -2 or x = -6/2 = -3\n            \n            Wait, let me check this... Actually, I think I might have made an error in my calculation.\n            The solutions should be x = -2 and x = -3.\n            \n            [Student shows good understanding but has some uncertainty and minor computational hesitation]\n            ",
+      "evaluation": {
+        "evaluation_id": "451866ce-9242-4da7-8c29-1eedd24ac2b0",
+        "exercise_id": "799d87de-fb53-400b-8346-f61f9963adc3",
+        "student_response": "\n            This is a quadratic equation, so I need to solve it using the quadratic formula.\n            \n            The equation is ax\u00b2 + bx + c = 0, where a = 1, b = 5, c = 6\n            \n            Using the quadratic formula: x = (-b \u00b1 \u221a(b\u00b2 - 4ac)) / 2a\n            \n            x = (-5 \u00b1 \u221a(25 - 24)) / 2\n            x = (-5 \u00b1 \u221a1) / 2\n            x = (-5 \u00b1 1) / 2\n            \n            So x = -4/2 = -2 or x = -6/2 = -3\n            \n            Wait, let me check this... Actually, I think I might have made an error in my calculation.\n            The solutions should be x = -2 and x = -3.\n            \n            [Student shows good understanding but has some uncertainty and minor computational hesitation]\n            ",
+        "competency_map": {
+          "correct_steps": [],
+          "missing_steps": [],
+          "incorrect_steps": [],
+          "partial_steps": []
+        },
+        "understanding_score": 0.0,
+        "mastery_achieved": false,
+        "feedback": "",
+        "needs_remediation": false,
+        "evaluated_at": "2025-07-10T21:00:55.531878"
+      },
+      "remediation": null,
+      "workflow_completed": true,
+      "total_steps": 4
+    },
+    "timestamp": "2025-07-10T21:00:55.532086",
+    "success": true
+  },
+  {
+    "scenario": {
+      "name": "Struggling Student",
+      "description": "Student who struggles but is trying",
+      "student_id": "struggling_student_003",
+      "interests": [
+        "sports",
+        "animals",
+        "food"
+      ],
+      "grade_level": "middle school",
+      "response_type": "struggling"
+    },
+    "result": {
+      "scenario_name": "Struggling Student",
+      "concept": {
+        "concept_id": "quadratic_equations_001",
+        "name": "Quadratic Equations",
+        "content": "Equations of the form ax\u00b2 + bx + c = 0, where a \u2260 0",
+        "type": "mathematical_concept",
+        "difficulty": "intermediate",
+        "learning_objectives": [
+          "Understand standard form of quadratic equations",
+          "Apply factoring method when possible",
+          "Use quadratic formula for all cases",
+          "Verify solutions by substitution"
+        ]
+      },
+      "student_profile": {
+        "student_id": "struggling_student_003",
+        "interests": [
+          "sports",
+          "animals",
+          "food"
+        ],
+        "grade_level": "middle school"
+      },
+      "exercise": {
+        "exercise_id": "303e9ff6-71d8-409d-bcca-5480d6e02b16",
+        "concept_id": "quadratic_equations_001",
+        "student_id": "struggling_student_003",
+        "type": "initial",
+        "difficulty": "basic",
+        "content": {
+          "scenario": "Imagine you're helping to organize a school sports day event. One activity involves setting up a mini obstacle course for your classmates. You need to calculate the optimal height for a hurdle so everyone can clear it safely. The hurdle's height follows a parabolic path described by a quadratic equation.",
+          "problem": "The height of the hurdle, in centimeters, at any point in time is given by the equation h(t) = -2t\u00b2 + 8t, where t represents time in seconds. Find the maximum height of the hurdle and at what time it reaches this height.",
+          "expected_steps": [
+            "Identify the quadratic equation: h(t) = -2t\u00b2 + 8t.",
+            "Recognize the standard form of a quadratic equation: ax\u00b2 + bx + c = 0.",
+            "Determine the values of a and b: a = -2, b = 8.",
+            "Use the formula for the vertex of a parabola, t = -b/(2a), to find the time when the maximum height occurs.",
+            "Substitute t back into the equation h(t) = -2t\u00b2 + 8t to calculate the maximum height.",
+            "Conclude that the maximum height is reached at t seconds, and the maximum height is h(t) centimeters."
+          ],
+          "success_criteria": "Successfully calculate the time and height at which the hurdle reaches its maximum. Clearly explain each step taken and why it was necessary.",
+          "cognitive_scaffolds": [
+            "Break down the problem by identifying the key components of the quadratic equation.",
+            "Focus on understanding the vertex formula and how it applies to finding maximum values.",
+            "Visualize the parabola shape to comprehend how the maximum height is found."
+          ],
+          "metacognitive_prompts": [
+            "Why is it important to find the vertex in a quadratic equation?",
+            "How does understanding the shape of a parabola help in solving this problem?",
+            "What steps did you find most challenging, and how did you overcome them?"
+          ]
+        },
+        "personalization": {
+          "interests_used": [
+            "sports",
+            "animals",
+            "food"
+          ],
+          "life_category": "academic",
+          "context": null
+        },
+        "expected_steps": [
+          "Identify the quadratic equation: h(t) = -2t\u00b2 + 8t.",
+          "Recognize the standard form of a quadratic equation: ax\u00b2 + bx + c = 0.",
+          "Determine the values of a and b: a = -2, b = 8.",
+          "Use the formula for the vertex of a parabola, t = -b/(2a), to find the time when the maximum height occurs.",
+          "Substitute t back into the equation h(t) = -2t\u00b2 + 8t to calculate the maximum height.",
+          "Conclude that the maximum height is reached at t seconds, and the maximum height is h(t) centimeters."
+        ],
+        "hints": [],
+        "created_at": "2025-07-10T21:01:05.276970"
+      },
+      "student_response": "\n            I think this is a quadratic equation because it has x\u00b2.\n            \n            I'm not sure which method to use. Maybe I can try factoring?\n            \n            x\u00b2 + 5x + 6 = 0\n            \n            I need to find two numbers that multiply to 6 and add to 5.\n            That would be 2 and 3.\n            \n            So (x + 2)(x + 3) = 0\n            \n            This means x + 2 = 0 or x + 3 = 0\n            So x = -2 or x = -3\n            \n            I think that's right but I'm not totally sure. I get confused with the signs sometimes.\n            ",
+      "evaluation": {
+        "evaluation_id": "260f4d87-cc60-4159-a88d-ddbb595c7a5e",
+        "exercise_id": "303e9ff6-71d8-409d-bcca-5480d6e02b16",
+        "student_response": "\n            I think this is a quadratic equation because it has x\u00b2.\n            \n            I'm not sure which method to use. Maybe I can try factoring?\n            \n            x\u00b2 + 5x + 6 = 0\n            \n            I need to find two numbers that multiply to 6 and add to 5.\n            That would be 2 and 3.\n            \n            So (x + 2)(x + 3) = 0\n            \n            This means x + 2 = 0 or x + 3 = 0\n            So x = -2 or x = -3\n            \n            I think that's right but I'm not totally sure. I get confused with the signs sometimes.\n            ",
+        "competency_map": {
+          "correct_steps": [],
+          "missing_steps": [],
+          "incorrect_steps": [],
+          "partial_steps": []
+        },
+        "understanding_score": 0.0,
+        "mastery_achieved": false,
+        "feedback": "",
+        "needs_remediation": false,
+        "evaluated_at": "2025-07-10T21:01:30.061089"
+      },
+      "remediation": null,
+      "workflow_completed": true,
+      "total_steps": 4
+    },
+    "timestamp": "2025-07-10T21:01:30.061385",
+    "success": true
+  },
+  {
+    "scenario": {
+      "name": "Lazy Student",
+      "description": "Student who doesn't try and just wants answers",
+      "student_id": "lazy_student_004",
+      "interests": [
+        "gaming",
+        "social media",
+        "movies"
+      ],
+      "grade_level": "high school",
+      "response_type": "lazy"
+    },
+    "result": {
+      "scenario_name": "Lazy Student",
+      "concept": {
+        "concept_id": "quadratic_equations_001",
+        "name": "Quadratic Equations",
+        "content": "Equations of the form ax\u00b2 + bx + c = 0, where a \u2260 0",
+        "type": "mathematical_concept",
+        "difficulty": "intermediate",
+        "learning_objectives": [
+          "Understand standard form of quadratic equations",
+          "Apply factoring method when possible",
+          "Use quadratic formula for all cases",
+          "Verify solutions by substitution"
+        ]
+      },
+      "student_profile": {
+        "student_id": "lazy_student_004",
+        "interests": [
+          "gaming",
+          "social media",
+          "movies"
+        ],
+        "grade_level": "high school"
+      },
+      "exercise": {
+        "exercise_id": "471abaea-ff84-4947-925e-f2df5d31a381",
+        "concept_id": "quadratic_equations_001",
+        "student_id": "lazy_student_004",
+        "type": "initial",
+        "difficulty": "basic",
+        "content": {
+          "scenario": "Imagine you're playing a strategy video game where you need to unlock a secret passage to advance to the next level. The passage is hidden behind a door that requires solving a puzzle. The puzzle presents a quadratic equation that you must solve to get the code to unlock the door.",
+          "problem": "The equation given is 2x\u00b2 + 4x - 6 = 0. Solve this quadratic equation to find the two possible keys (x-values) that will unlock the secret passage.",
+          "expected_steps": [
+            "Step 1: Identify the coefficients a, b, and c from the equation 2x\u00b2 + 4x - 6 = 0.",
+            "Step 2: Use the quadratic formula x = [-b \u00b1 sqrt(b\u00b2 - 4ac)] / (2a), substituting the identified values.",
+            "Step 3: Calculate the discriminant b\u00b2 - 4ac to determine the nature of the roots.",
+            "Step 4: Compute the square root of the discriminant and determine the two potential solutions using the plus-minus operation in the formula.",
+            "Step 5: Divide the results by 2a to find the two x-values.",
+            "Step 6: Verify the solutions by substituting them back into the original equation to ensure they satisfy the equation."
+          ],
+          "success_criteria": "The student successfully identifies the correct coefficients, applies the quadratic formula accurately, calculates the discriminant, and finds the correct x-values that solve the equation. The student verifies these solutions by substitution.",
+          "cognitive_scaffolds": [
+            "Break down the equation step by step and focus on one part of the quadratic formula at a time.",
+            "Remember to handle the square root operation carefully, ensuring both positive and negative roots are considered.",
+            "Check each calculation before moving to the next step to avoid compounding errors."
+          ],
+          "metacognitive_prompts": [
+            "What strategies did you use to identify and apply the correct formula?",
+            "How did you ensure your calculations were accurate at each step?",
+            "What would you do differently if you were to solve a similar problem in the future?"
+          ]
+        },
+        "personalization": {
+          "interests_used": [
+            "gaming",
+            "social media",
+            "movies"
+          ],
+          "life_category": "academic",
+          "context": null
+        },
+        "expected_steps": [
+          "Step 1: Identify the coefficients a, b, and c from the equation 2x\u00b2 + 4x - 6 = 0.",
+          "Step 2: Use the quadratic formula x = [-b \u00b1 sqrt(b\u00b2 - 4ac)] / (2a), substituting the identified values.",
+          "Step 3: Calculate the discriminant b\u00b2 - 4ac to determine the nature of the roots.",
+          "Step 4: Compute the square root of the discriminant and determine the two potential solutions using the plus-minus operation in the formula.",
+          "Step 5: Divide the results by 2a to find the two x-values.",
+          "Step 6: Verify the solutions by substituting them back into the original equation to ensure they satisfy the equation."
+        ],
+        "hints": [],
+        "created_at": "2025-07-10T21:01:42.380750"
+      },
+      "student_response": "\n            I don't know. Can you just tell me the answer?\n            \n            This looks hard and I don't really understand what I'm supposed to do.\n            ",
+      "evaluation": {
+        "evaluation_id": "0eb7a7b2-5f4f-4757-96f4-d9ac566bf999",
+        "exercise_id": "471abaea-ff84-4947-925e-f2df5d31a381",
+        "student_response": "\n            I don't know. Can you just tell me the answer?\n            \n            This looks hard and I don't really understand what I'm supposed to do.\n            ",
+        "competency_map": {
+          "correct_steps": [],
+          "missing_steps": [],
+          "incorrect_steps": [],
+          "partial_steps": []
+        },
+        "understanding_score": 0.0,
+        "mastery_achieved": false,
+        "feedback": "",
+        "needs_remediation": false,
+        "evaluated_at": "2025-07-10T21:01:49.253083"
+      },
+      "remediation": null,
+      "workflow_completed": true,
+      "total_steps": 4
+    },
+    "timestamp": "2025-07-10T21:01:49.253271",
+    "success": true
+  }
+]
