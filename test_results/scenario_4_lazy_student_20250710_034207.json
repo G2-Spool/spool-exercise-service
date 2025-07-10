@@ -1,0 +1,142 @@
+{
+  "scenario": {
+    "name": "Lazy Student",
+    "description": "Student who isn't trying and wants answers",
+    "student_id": "lazy_student_004",
+    "interests": [
+      "gaming",
+      "social media",
+      "entertainment"
+    ],
+    "response_generator": "<bound method WorkflowTestSuite._generate_lazy_response of <comprehensive_workflow_test.WorkflowTestSuite object at 0x104ac0830>>"
+  },
+  "exercise": {
+    "exercise_id": "3ed95a9b-1115-4608-b5a6-8b6026c3b87d",
+    "concept_id": "quadratic_equations",
+    "student_id": "lazy_student_004",
+    "type": "initial",
+    "difficulty": "intermediate",
+    "content": {
+      "scenario": "You're working on a career project involving gaming and need to apply Quadratic Equations.",
+      "problem": "Explain step-by-step how you would solve this intermediate problem using Quadratic Equations. Walk through your complete thought process.",
+      "expected_steps": [
+        "Identify the key components of the problem",
+        "Apply the main concept principles",
+        "Work through the solution systematically",
+        "Verify the result makes sense"
+      ],
+      "hints": [
+        "Start by identifying what you know and what you need to find",
+        "Consider how this relates to your interest in gaming",
+        "Think about the core principles of Quadratic Equations"
+      ],
+      "personalized_context": "This problem connects Quadratic Equations to your interest in gaming for career applications.",
+      "success_criteria": "Student explains all key steps with clear reasoning"
+    },
+    "personalization": {
+      "interests_used": [
+        "gaming",
+        "social media",
+        "entertainment"
+      ],
+      "life_category": "career",
+      "context": "This problem connects Quadratic Equations to your interest in gaming for career applications."
+    },
+    "expected_steps": [
+      "Identify the key components of the problem",
+      "Apply the main concept principles",
+      "Work through the solution systematically",
+      "Verify the result makes sense"
+    ],
+    "hints": [
+      "Start by identifying what you know and what you need to find",
+      "Consider how this relates to your interest in gaming",
+      "Think about the core principles of Quadratic Equations"
+    ],
+    "created_at": "2025-07-10T03:42:07.961617"
+  },
+  "student_response": "\nCan you just tell me the answer? I don't really understand this stuff.\n\nIs it x = 5? Or maybe x = -2? \n\nI tried looking it up online but there are so many different methods and I don't know which one to use.\n\nCould you show me the steps so I can copy them? I have other homework to do too.\n\nJust give me the formula and I'll plug in the numbers. What's the quadratic formula again?\n",
+  "evaluation": {
+    "evaluation_id": "39f63dfe-3772-4221-be7f-a70056df749e",
+    "exercise_id": "3ed95a9b-1115-4608-b5a6-8b6026c3b87d",
+    "student_response": "\nCan you just tell me the answer? I don't really understand this stuff.\n\nIs it x = 5? Or maybe x = -2? \n\nI tried looking it up online but there are so many different methods and I don't know which one to use.\n\nCould you show me the steps so I can copy them? I have other homework to do too.\n\nJust give me the formula and I'll plug in the numbers. What's the quadratic formula again?\n",
+    "competency_map": {
+      "correct_steps": [
+        "Mentioned solution method",
+        "Described systematic approach"
+      ],
+      "missing_steps": [
+        "Did not clearly identify the problem approach",
+        "Did not mention verification"
+      ],
+      "incorrect_steps": [],
+      "partial_steps": []
+    },
+    "understanding_score": 0.5,
+    "mastery_achieved": false,
+    "feedback": "Good progress! Consider elaborating on the missing steps for a complete solution.",
+    "needs_remediation": true,
+    "evaluated_at": "2025-07-10T03:42:07.961650"
+  },
+  "remediation": {
+    "remediation_id": "f6cc3861-d778-489f-a32f-ae7efc428477",
+    "evaluation_id": "39f63dfe-3772-4221-be7f-a70056df749e",
+    "exercise_id": "3ed95a9b-1115-4608-b5a6-8b6026c3b87d",
+    "student_id": "lazy_student_004",
+    "target_gap": "Did not clearly identify the problem approach",
+    "content": {
+      "explanation": "Let's work on Did not clearly identify the problem approach. Quadratic Equations is a fundamental concept that builds on identifying key problem components.",
+      "step_by_step_guide": [
+        "Step 1: Take time to clearly read and understand what the problem is asking",
+        "Step 2: Identify the key information given and what you need to find",
+        "Step 3: Choose the appropriate method for Quadratic Equations",
+        "Step 4: Work through the solution systematically",
+        "Step 5: Always verify your answer makes sense"
+      ],
+      "examples": [
+        {
+          "problem": "Here's a simple example of Quadratic Equations",
+          "solution": "Step-by-step solution would be provided here",
+          "context": "This connects to your interest in gaming"
+        }
+      ],
+      "practice_problems": [
+        {
+          "problem": "Practice problem focusing on Did not clearly identify the problem approach",
+          "difficulty": "easier",
+          "hint": "Remember to focus on did not clearly identify the problem approach"
+        }
+      ],
+      "personalized_context": "Since you're interested in gaming, here's how Quadratic Equations applies in that area...",
+      "key_insights": [
+        "The most important thing about Did not clearly identify the problem approach is to take it step by step",
+        "Always start by clearly identifying what you know and what you need to find",
+        "Practice makes perfect - the more you work with Quadratic Equations, the easier it becomes"
+      ]
+    },
+    "personalized_context": "Since you're interested in gaming, here's how Quadratic Equations applies in that area...",
+    "practice_problems": [
+      {
+        "problem": "Practice problem focusing on Did not clearly identify the problem approach",
+        "difficulty": "easier",
+        "hint": "Remember to focus on did not clearly identify the problem approach"
+      }
+    ],
+    "created_at": "2025-07-10T03:42:07.961681"
+  },
+  "timing": {
+    "start_time": "2025-07-10T03:42:07.961606",
+    "end_time": "2025-07-10T03:42:07.961701",
+    "duration_seconds": 9.5e-05
+  },
+  "summary": {
+    "exercise_id": "3ed95a9b-1115-4608-b5a6-8b6026c3b87d",
+    "student_type": "Lazy Student",
+    "understanding_score": 0.5,
+    "mastery_achieved": false,
+    "needs_remediation": true,
+    "correct_steps": 2,
+    "missing_steps": 2,
+    "incorrect_steps": 0
+  }
+}
