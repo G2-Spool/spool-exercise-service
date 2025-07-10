@@ -1,9 +1,10 @@
 """AWS configuration utilities for production deployment."""
 
 import boto3
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 import structlog
 from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
+from mypy_boto3_ssm import SSMClient
 
 logger = structlog.get_logger()
 
@@ -14,10 +15,10 @@ class AWSParameterStore:
     def __init__(self, region: str = "us-east-1"):
         """Initialize AWS Parameter Store client."""
         self.region = region
-        self._client = None
+        self._client: Optional[SSMClient] = None
 
     @property
-    def client(self) -> Any:
+    def client(self) -> SSMClient:
         """Lazy initialization of SSM client."""
         if self._client is None:
             try:
