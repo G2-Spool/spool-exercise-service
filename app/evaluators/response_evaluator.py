@@ -285,7 +285,10 @@ class ResponseEvaluator:
                 score = float(match.group(1))
                 # Normalize to 0-1 scale
                 if score > 1:
-                    score = score / 100 if score <= 100 else score / 10
+                    if score <= 10:
+                        score = score / 10  # 9 -> 0.9 (out of 10)
+                    else:
+                        score = score / 100  # 90 -> 0.9 (out of 100)
                 return min(score, 1.0)
         
         # Fallback: analyze quality indicators
