@@ -269,8 +269,8 @@ class ExerciseWorkflowTester:
         await self._save_comprehensive_results()
         
         print(f"\n📁 Results saved to '{self.output_dir}' directory")
-        print(f"📊 Check workflow_test_results.json for detailed JSON data")
-        print(f"📖 Check workflow_test_report.md for comprehensive analysis report")
+        print(f"📊 Check workflow_test_results_YYYYMMDD_HHMMSS.json for detailed JSON data")
+        print(f"📖 Check workflow_test_report_YYYYMMDD_HHMMSS.md for comprehensive analysis report")
     
     async def _run_single_test(self, scenario: Dict[str, Any], personality: str = "default") -> Dict[str, Any]:
         """Run a single test following the correct flow."""
@@ -539,26 +539,20 @@ Just give me the answer so I can move on to the next problem.
             return "I'm not sure how to approach this problem."
     
     async def _save_comprehensive_results(self):
-        """Save comprehensive test results to files."""
+        """Save comprehensive test results to timestamped files only."""
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         
-        # Save raw JSON results (timestamped and latest)
+        # Save raw JSON results (timestamped only)
         json_file = os.path.join(self.output_dir, f"workflow_test_results_{timestamp}.json")
-        latest_json = os.path.join(self.output_dir, "workflow_test_results.json")
         
         with open(json_file, 'w') as f:
             json.dump(self.test_results, f, indent=2, default=str)
-        with open(latest_json, 'w') as f:
-            json.dump(self.test_results, f, indent=2, default=str)
         
-        # Save comprehensive markdown report (timestamped and latest)
+        # Save comprehensive markdown report (timestamped only)
         md_file = os.path.join(self.output_dir, f"workflow_test_report_{timestamp}.md")
-        latest_md = os.path.join(self.output_dir, "workflow_test_report.md")
         
         comprehensive_report = self._generate_comprehensive_report()
         with open(md_file, 'w') as f:
-            f.write(comprehensive_report)
-        with open(latest_md, 'w') as f:
             f.write(comprehensive_report)
     
     def _generate_comprehensive_report(self) -> str:
