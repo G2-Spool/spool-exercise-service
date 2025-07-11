@@ -12,6 +12,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.dependencies import get_redis_cache
+from app.core.database import init_database, close_database, get_database_manager
 from app.langgraph.workflows import ExerciseWorkflow
 from app.routers import exercise, evaluation, remediation
 
@@ -29,6 +30,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize services
     redis_cache = await get_redis_cache()
     workflow = ExerciseWorkflow()
+    
+    # Initialize database in production
+    if settings.ENVIRONMENT == "production":
+        await init_database()
+        db_manager = await get_database_manager()
+        app.state.db_manager = db_manager
 
     # Store in app state
     app.state.redis_cache = redis_cache
@@ -42,6 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Shutdown
     logger.info("Shutting down Spool Exercise Service")
+    
+    # Close database connection
+    if settings.ENVIRONMENT == "production":
+        await close_database()
 
 
 # Create FastAPI app
@@ -115,6 +126,18 @@ async def health_check(request: Request) -> JSONResponse:
     except Exception as e:
         health_status["checks"]["langgraph"] = f"unhealthy: {str(e)}"
         health_status["status"] = "degraded"
+        
+    # Check database (production only)
+    if settings.ENVIRONMENT == "production":
+        try:
+            if hasattr(request.app.state, "db_manager"):
+                is_healthy = await request.app.state.db_manager.health_check()
+                health_status["checks"]["database"] = "healthy" if is_healthy else "unhealthy"
+                if not is_healthy:
+                    health_status["status"] = "degraded"
+        except Exception as e:
+            health_status["checks"]["database"] = f"unhealthy: {str(e)}"
+            health_status["status"] = "degraded"
 
     status_code = 200 if health_status["status"] == "healthy" else 503
     return JSONResponse(content=health_status, status_code=status_code)
