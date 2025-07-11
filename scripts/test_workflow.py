@@ -750,6 +750,8 @@ x = (-6 ± 4) / 2
 x = -2 / 2 = -1 and x = -10 / 2 = -5
 
 So x = -1 and x = -5.
+
+I'm not sure if this is right though, and I don't know how to check my work.
 """
 
         elif response_type == "lazy":
