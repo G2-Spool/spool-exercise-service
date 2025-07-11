@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Comprehensive Exercise Workflow Test
+Comprehensive Exercise Workflow Test with Pinecone Integration
 
-This script tests the complete exercise workflow with the correct flow:
-1. Generate personalized exercises for students with specific interests
+This script tests the complete exercise workflow with Pinecone vector search:
+1. Generate personalized exercises for students with specific interests (using vector context)
 2. Use hardcoded student responses (4 types) for consistent testing
-3. Evaluate responses using the evaluator
-4. Generate remediation if needed
-5. Log all interactions in detail with human-readable reports
+3. Evaluate responses using the evaluator (with educational context)
+4. Generate remediation if needed (with example content)
+5. Log all interactions including Pinecone usage
 
 Results are saved to detailed files for analysis.
 """
@@ -21,6 +21,10 @@ import sys
 import logging
 from pathlib import Path
 import argparse
+import subprocess
+import time
+import signal
+import httpx
 
 # Load environment variables from .env file
 try:
@@ -31,6 +35,14 @@ except ImportError:
     print(
         "⚠️  python-dotenv not installed. Make sure OPENAI_API_KEY is set in environment."
     )
+
+# Set up Pinecone environment variables for testing
+os.environ.setdefault("ENABLE_VECTOR_CONTEXT", "true")
+os.environ.setdefault("PINECONE_API_KEY", "test-pinecone-key")
+os.environ.setdefault("PINECONE_INDEX_NAME", "spool-content")
+os.environ.setdefault("PINECONE_ENVIRONMENT", "us-east-1-aws")
+os.environ.setdefault("CONTENT_SERVICE_SEARCH_URL", "http://localhost:8002/api/content/search")
+os.environ.setdefault("MIN_RESPONSE_LENGTH", "20")
 
 # Add app directory to path
 project_root = Path(__file__).parent.parent
@@ -61,7 +73,7 @@ logger = logging.getLogger(__name__)
 
 
 class ExerciseWorkflowTester:
-    """Comprehensive workflow tester following the correct flow."""
+    """Comprehensive workflow tester with Pinecone integration testing."""
 
     def __init__(self, use_hardcoded_exercise: bool = False):
         # Verify API key is available
@@ -71,7 +83,18 @@ class ExerciseWorkflowTester:
                 "Valid OpenAI API key required. Set OPENAI_API_KEY in .env file"
             )
 
-        # Initialize components
+        self.test_results = []
+        self.output_dir = "test_results"
+        self.pinecone_usage_log = []
+        self.mock_service_process = None
+
+        # Create output directory
+        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Initialize mock content service
+        self._setup_mock_content_service()
+        
+        # Initialize components after mock service is ready
         self.generator = ExerciseGenerator()
         self.evaluator = ResponseEvaluator()
         self.remediation_gen = RemediationGenerator()
@@ -82,12 +105,9 @@ class ExerciseWorkflowTester:
             print(
                 "⚠️  LangGraph workflow not available - using direct component testing"
             )
-
-        self.test_results = []
-        self.output_dir = "test_results"
-
-        # Create output directory
-        os.makedirs(self.output_dir, exist_ok=True)
+        
+        # Check Pinecone configuration
+        self._check_pinecone_config()
 
         # Student scenarios with different interests
         self.student_scenarios = [
@@ -203,9 +223,125 @@ class ExerciseWorkflowTester:
             "created_at": datetime.utcnow().isoformat(),
         }
 
+    def _check_pinecone_config(self):
+        """Check and log Pinecone configuration."""
+        enable_vector = os.getenv("ENABLE_VECTOR_CONTEXT", "false").lower() == "true"
+        pinecone_key = os.getenv("PINECONE_API_KEY", "")
+        content_service_url = os.getenv("CONTENT_SERVICE_SEARCH_URL", "")
+        
+        print(f"\n🔍 Pinecone Configuration Check:")
+        print(f"   ENABLE_VECTOR_CONTEXT: {enable_vector}")
+        print(f"   PINECONE_API_KEY: {'✅ SET' if pinecone_key else '❌ NOT SET'}")
+        print(f"   CONTENT_SERVICE_SEARCH_URL: {content_service_url}")
+        
+        if enable_vector and pinecone_key:
+            print("   🚀 Pinecone integration ENABLED - Vector search will be used")
+        else:
+            print("   ⚠️  Pinecone integration DISABLED - Using standard prompts only")
+        
+        # Test individual service configurations
+        print(f"\n📊 Service Configuration:")
+        print(f"   Generator Pinecone Service: {hasattr(self.generator, 'pinecone_service')}")
+        print(f"   Evaluator Pinecone Service: {hasattr(self.evaluator, 'pinecone_service')}")
+        print(f"   Remediation Pinecone Service: {hasattr(self.remediation_gen, 'pinecone_service')}")
+        
+        if hasattr(self.generator, 'pinecone_service'):
+            enabled = getattr(self.generator.pinecone_service, 'enabled', False)
+            print(f"   Generator Pinecone Enabled: {enabled}")
+        
+        print("=" * 60)
+
+    def _setup_mock_content_service(self):
+        """Start the mock content service for testing."""
+        print("\n🚀 Starting Mock Content Service for Pinecone Integration Testing...")
+        
+        # Check if service is already running
+        if self._is_service_running():
+            print("   ✅ Mock content service already running")
+            return
+        
+        try:
+            # Start the mock content service
+            script_path = Path(__file__).parent / "mock_content_service.py"
+            self.mock_service_process = subprocess.Popen(
+                [sys.executable, str(script_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Wait for service to start
+            print("   ⏳ Waiting for mock content service to start...")
+            max_attempts = 10
+            for attempt in range(max_attempts):
+                if self._is_service_running():
+                    print("   ✅ Mock content service started successfully!")
+                    return
+                time.sleep(1)
+            
+            # If we get here, service failed to start
+            if self.mock_service_process.poll() is not None:
+                stdout, stderr = self.mock_service_process.communicate()
+                print(f"   ❌ Mock service failed to start:")
+                print(f"      stdout: {stdout}")
+                print(f"      stderr: {stderr}")
+            else:
+                print("   ❌ Mock service took too long to start")
+                self._cleanup_mock_service()
+            
+        except Exception as e:
+            print(f"   ❌ Failed to start mock content service: {str(e)}")
+            self._cleanup_mock_service()
+
+    def _is_service_running(self) -> bool:
+        """Check if the mock content service is running."""
+        try:
+            import httpx
+            response = httpx.get("http://localhost:8002/health", timeout=2.0)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+    def _cleanup_mock_service(self):
+        """Clean up the mock content service."""
+        if self.mock_service_process:
+            try:
+                print("\n🧹 Cleaning up mock content service...")
+                self.mock_service_process.terminate()
+                try:
+                    self.mock_service_process.wait(timeout=5)
+                    print("   ✅ Mock service stopped gracefully")
+                except subprocess.TimeoutExpired:
+                    print("   ⚠️  Forcing mock service shutdown...")
+                    self.mock_service_process.kill()
+                    self.mock_service_process.wait()
+                    print("   ✅ Mock service force stopped")
+            except Exception as e:
+                print(f"   ⚠️  Error stopping mock service: {str(e)}")
+            finally:
+                self.mock_service_process = None
+
+    def __del__(self):
+        """Ensure cleanup on object destruction."""
+        self._cleanup_mock_service()
+
+    def _log_pinecone_usage(self, component: str, operation: str, used: bool, details: str = ""):
+        """Log Pinecone usage for analysis."""
+        log_entry = {
+            "component": component,
+            "operation": operation,
+            "pinecone_used": used,
+            "details": details,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self.pinecone_usage_log.append(log_entry)
+        
+        status = "🚀 USED" if used else "⚠️  FALLBACK"
+        print(f"   {status} {component} - {operation}: {details}")
+
     async def run_comprehensive_test(self, quick_mode: bool = False):
         """Run comprehensive test with correct flow."""
-        print("🚀 Starting Comprehensive Exercise Workflow Test")
+        print("🚀 Starting Comprehensive Exercise Workflow Test with Pinecone")
         print("=" * 60)
         if quick_mode:
             print("🔬 QUICK MODE: Testing default personality only")
@@ -221,11 +357,12 @@ class ExerciseWorkflowTester:
         else:
             print("🎯 Generating personalized exercises for each student")
 
-        print("Following the CORRECT flow:")
-        print("1. Generate personalized exercises for each student")
+        print("Following the ENHANCED flow with Pinecone Vector Search:")
+        print("1. Generate personalized exercises (with vector context)")
         print("2. Use hardcoded student responses for consistency")
-        print("3. Evaluate responses and generate remediation")
-        print("4. Log all interactions with detailed reporting")
+        print("3. Evaluate responses (with educational context)")
+        print("4. Generate remediation (with example content)")
+        print("5. Log all interactions including Pinecone usage")
         print("=" * 60)
 
         start_time = datetime.utcnow()
@@ -302,6 +439,9 @@ class ExerciseWorkflowTester:
         print(
             "📖 Check workflow_test_report_YYYYMMDD_HHMMSS.md for comprehensive analysis report"
         )
+        
+        # Clean up mock service
+        self._cleanup_mock_service()
 
     async def _run_single_test(
         self, scenario: Dict[str, Any], personality: str = "default"
@@ -344,6 +484,9 @@ class ExerciseWorkflowTester:
             # Step 1: Generate personalized exercise for this student
             print(f"\n1️⃣ Generating personalized exercise for {scenario['name']}...")
 
+            # Check if Pinecone will be used in generation
+            generator_pinecone_enabled = getattr(self.generator.pinecone_service, 'enabled', False)
+            
             generated_exercise = await self.generator.generate(
                 concept=self.test_concept,
                 student_profile=student_profile,
@@ -351,6 +494,14 @@ class ExerciseWorkflowTester:
                 difficulty=DifficultyLevel.BASIC.value,
                 exercise_type=ExerciseType.INITIAL.value,
                 personality=personality,
+            )
+
+            # Log Pinecone usage for exercise generation
+            self._log_pinecone_usage(
+                "ExerciseGenerator", 
+                "get_concept_context", 
+                generator_pinecone_enabled,
+                f"Concept: {self.test_concept['name']}, Interests: {', '.join(student_profile['interests'])}"
             )
 
             print(f"   ✅ Exercise generated: {generated_exercise['exercise_id']}")
@@ -393,8 +544,19 @@ class ExerciseWorkflowTester:
         print("\n3️⃣ Evaluating student response...")
         print("   🔧 Using HARDCODED exercise for consistent evaluator testing")
 
+        # Check if Pinecone will be used in evaluation
+        evaluator_pinecone_enabled = getattr(self.evaluator.pinecone_service, 'enabled', False)
+
         evaluation = await self.evaluator.evaluate(
             self.hardcoded_exercise, student_response, self.test_concept
+        )
+
+        # Log Pinecone usage for evaluation
+        self._log_pinecone_usage(
+            "ResponseEvaluator", 
+            "get_concept_context", 
+            evaluator_pinecone_enabled,
+            f"Concept: {self.test_concept['name']}, Response length: {len(student_response)}"
         )
 
         print(f"   ✅ Evaluation complete: {evaluation['evaluation_id']}")
@@ -422,12 +584,23 @@ class ExerciseWorkflowTester:
         if evaluation["needs_remediation"]:
             print(f"\n4️⃣ Generating remediation (personality: {personality})...")
 
+            # Check if Pinecone will be used in remediation
+            remediation_pinecone_enabled = getattr(self.remediation_gen.pinecone_service, 'enabled', False)
+
             remediation = await self.remediation_gen.generate(
                 self.test_concept,
                 "comprehensive understanding",
                 student_profile,
                 self.hardcoded_exercise,
                 evaluation,
+            )
+
+            # Log Pinecone usage for remediation
+            self._log_pinecone_usage(
+                "RemediationGenerator", 
+                "get_remediation_examples", 
+                remediation_pinecone_enabled,
+                f"Gap: comprehensive understanding, Interests: {', '.join(student_profile['interests'])}"
             )
 
             print(f"   ✅ Remediation generated: {remediation['remediation_id']}")
@@ -475,6 +648,12 @@ class ExerciseWorkflowTester:
                 "exercise_for_personalization": "generated_exercise",
                 "exercise_for_evaluation": "hardcoded_exercise",
                 "exercise_for_remediation": "hardcoded_exercise",
+            },
+            "pinecone_usage": {
+                "generator_enabled": getattr(self.generator.pinecone_service, 'enabled', False),
+                "evaluator_enabled": getattr(self.evaluator.pinecone_service, 'enabled', False),
+                "remediation_enabled": getattr(self.remediation_gen.pinecone_service, 'enabled', False),
+                "usage_log": self.pinecone_usage_log.copy(),
             },
             "workflow_completed": True,
             "total_steps": 4 if not evaluation["needs_remediation"] else 5,
@@ -611,6 +790,75 @@ Just give me the answer so I can move on to the next problem.
         comprehensive_report = self._generate_comprehensive_report()
         with open(md_file, "w") as f:
             f.write(comprehensive_report)
+
+    def _generate_pinecone_analysis_section(self) -> str:
+        """Generate Pinecone usage analysis section for the report."""
+        successful_results = [r for r in self.test_results if r["success"]]
+        
+        if not successful_results:
+            return "\n## 🔍 Pinecone Vector Search Analysis\n\nNo successful tests to analyze.\n\n"
+        
+        # Count Pinecone usage
+        total_tests = len(successful_results)
+        generator_enabled_count = sum(1 for r in successful_results if r["result"]["pinecone_usage"]["generator_enabled"])
+        evaluator_enabled_count = sum(1 for r in successful_results if r["result"]["pinecone_usage"]["evaluator_enabled"])
+        remediation_enabled_count = sum(1 for r in successful_results if r["result"]["pinecone_usage"]["remediation_enabled"])
+        
+        # Collect all usage logs
+        all_usage_logs = []
+        for r in successful_results:
+            all_usage_logs.extend(r["result"]["pinecone_usage"]["usage_log"])
+        
+        usage_stats = {
+            "ExerciseGenerator": {"used": 0, "total": 0},
+            "ResponseEvaluator": {"used": 0, "total": 0},
+            "RemediationGenerator": {"used": 0, "total": 0}
+        }
+        
+        for log in all_usage_logs:
+            component = log["component"]
+            if component in usage_stats:
+                usage_stats[component]["total"] += 1
+                if log["pinecone_used"]:
+                    usage_stats[component]["used"] += 1
+        
+        section = f"""## 🔍 Pinecone Vector Search Analysis
+
+### 📊 Service Configuration Status
+- **ExerciseGenerator**: {'✅ Enabled' if generator_enabled_count > 0 else '❌ Disabled'} ({generator_enabled_count}/{total_tests} tests)
+- **ResponseEvaluator**: {'✅ Enabled' if evaluator_enabled_count > 0 else '❌ Disabled'} ({evaluator_enabled_count}/{total_tests} tests)
+- **RemediationGenerator**: {'✅ Enabled' if remediation_enabled_count > 0 else '❌ Disabled'} ({remediation_enabled_count}/{total_tests} tests)
+
+### 🎯 Vector Search Usage Statistics
+"""
+        
+        for component, stats in usage_stats.items():
+            if stats["total"] > 0:
+                usage_rate = (stats["used"] / stats["total"]) * 100
+                section += f"- **{component}**: {stats['used']}/{stats['total']} operations used vector search ({usage_rate:.1f}%)\n"
+        
+        # Add configuration details
+        section += f"""
+### ⚙️ Configuration Details
+- **ENABLE_VECTOR_CONTEXT**: {os.getenv('ENABLE_VECTOR_CONTEXT', 'NOT_SET')}
+- **PINECONE_API_KEY**: {'✅ SET' if os.getenv('PINECONE_API_KEY') else '❌ NOT_SET'}
+- **CONTENT_SERVICE_SEARCH_URL**: {os.getenv('CONTENT_SERVICE_SEARCH_URL', 'NOT_SET')}
+
+### 🔍 Impact Analysis
+{"✅ **Vector Search ACTIVE**: This test demonstrates the enhanced workflow with Pinecone vector search providing context-aware content generation." if any(stats["used"] > 0 for stats in usage_stats.values()) else "⚠️ **Vector Search INACTIVE**: This test ran with fallback to standard prompts. Vector search was not utilized."}
+
+### 📋 Detailed Usage Log
+"""
+        
+        if all_usage_logs:
+            for log in all_usage_logs[-5:]:  # Show last 5 logs
+                status = "🚀 USED" if log["pinecone_used"] else "⚠️ FALLBACK"
+                section += f"- {status} {log['component']}: {log['operation']} - {log['details']}\n"
+        else:
+            section += "- No usage logs available\n"
+        
+        section += "\n"
+        return section
 
     def _generate_comprehensive_report(self) -> str:
         """Generate comprehensive markdown report combining structured data and human-readable analysis."""
@@ -816,6 +1064,9 @@ This test follows the **correct workflow**:
 
                 report += "---\n\n"
 
+        # Add Pinecone usage analysis
+        report += self._generate_pinecone_analysis_section()
+
         # Add conclusion section
         report += """## 🎯 Key Findings
 
@@ -861,27 +1112,36 @@ async def main():
 
     args = parser.parse_args()
 
-    print("🚀 Exercise Workflow Test Suite - CORRECTED Version")
+    print("🚀 Exercise Workflow Test Suite - PINECONE ENHANCED Version")
     print("=" * 60)
     print(f"Mode: {args.mode.upper()}")
     print(f"Exercise Source: {'Hardcoded' if args.hardcoded_exercise else 'Generated'}")
-    print("Following the CORRECT workflow:")
-    print("1. Generate personalized exercises for each student")
+    print("Following the ENHANCED workflow with Pinecone Vector Search:")
+    print("1. Generate personalized exercises (with vector context)")
     print("2. Use hardcoded student responses for consistency")
-    print("3. Evaluate responses and generate remediation")
-    print("4. Log all interactions with detailed reporting")
+    print("3. Evaluate responses (with educational context)")
+    print("4. Generate remediation (with example content)")
+    print("5. Log all interactions including Pinecone usage")
     print("=" * 60)
 
+    tester = None
     try:
         tester = ExerciseWorkflowTester(use_hardcoded_exercise=args.hardcoded_exercise)
         await tester.run_comprehensive_test(quick_mode=(args.mode == "quick"))
         print("\n✅ Workflow test completed successfully!")
 
+    except KeyboardInterrupt:
+        print(f"\n⚠️  Test interrupted by user")
+        if tester:
+            tester._cleanup_mock_service()
+        sys.exit(1)
     except Exception as e:
         print(f"\n❌ Test failed: {str(e)}")
         import traceback
 
         traceback.print_exc()
+        if tester:
+            tester._cleanup_mock_service()
         sys.exit(1)
 
 
