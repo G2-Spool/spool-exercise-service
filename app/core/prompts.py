@@ -1,11 +1,11 @@
 """Chain-of-thought prompting strategies and templates."""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 
 class ChainOfThoughtPrompts:
     """Enhanced prompts using chain-of-thought strategies."""
-    
+
     @staticmethod
     def get_step_by_step_instruction_template() -> str:
         """Template for explicit step-by-step instructions."""
@@ -19,7 +19,7 @@ class ChainOfThoughtPrompts:
         
         Show your reasoning for each step before moving to the next.
         """
-    
+
     @staticmethod
     def get_intermediate_questions_template() -> str:
         """Template for breaking complex tasks into subtasks."""
@@ -38,7 +38,7 @@ class ChainOfThoughtPrompts:
         - Execute the solution step by step
         - Verify the result makes sense
         """
-    
+
     @staticmethod
     def get_self_check_template() -> str:
         """Template for self-verification prompts."""
@@ -59,7 +59,7 @@ class ChainOfThoughtPrompts:
         - Was this the most efficient approach?
         - Are there alternative methods that might work?
         """
-    
+
     @staticmethod
     def get_worked_example_template(concept_name: str) -> str:
         """Template providing worked example format."""
@@ -79,7 +79,7 @@ class ChainOfThoughtPrompts:
         
         Follow this exact format for your solution.
         """
-    
+
     @staticmethod
     def get_reflection_template() -> str:
         """Template for reflection and improvement."""
@@ -102,13 +102,13 @@ class ChainOfThoughtPrompts:
         - Which method would be most efficient?
         - When would you use different approaches?
         """
-    
+
     @staticmethod
     def create_enhanced_exercise_prompt(
         concept: Dict[str, Any],
         student_profile: Dict[str, Any],
         context_chunks: List[Dict[str, Any]],
-        **kwargs
+        **kwargs: Any,
     ) -> str:
         """Create enhanced exercise generation prompt with chain-of-thought."""
         base_prompt = f"""
@@ -130,14 +130,14 @@ class ChainOfThoughtPrompts:
         - **Content**: {concept.get('content', 'No description provided')}
         - **Type**: {concept.get('type', 'general')}
         """
-        
+
         # Add context if available
         if context_chunks:
             base_prompt += "\n## Additional Context\n"
             for i, chunk in enumerate(context_chunks[:2]):
-                content = chunk.get('content', str(chunk))
+                content = chunk.get("content", str(chunk))
                 base_prompt += f"**Context {i+1}**: {content[:300]}...\n"
-        
+
         base_prompt += f"""
         ## Exercise Requirements
         {ChainOfThoughtPrompts.get_intermediate_questions_template()}
@@ -157,16 +157,16 @@ class ChainOfThoughtPrompts:
         
         Return your response as JSON with the standard exercise format.
         """
-        
+
         return base_prompt
-    
+
     @staticmethod
     def create_enhanced_evaluation_prompt(
         exercise: Dict[str, Any],
         student_response: str,
         concept: Dict[str, Any],
         context_chunks: List[Dict[str, Any]],
-        **kwargs
+        **kwargs: Any,
     ) -> str:
         """Create enhanced evaluation prompt with chain-of-thought."""
         base_prompt = f"""
@@ -199,14 +199,14 @@ class ChainOfThoughtPrompts:
         4. **Completeness**: Did they address all required components?
         5. **Verification**: Did they check their work appropriately?
         """
-        
+
         # Add context if available
         if context_chunks:
             base_prompt += "\n## Educational Context for Verification\n"
             for i, chunk in enumerate(context_chunks[:2]):
-                content = chunk.get('content', str(chunk))
+                content = chunk.get("content", str(chunk))
                 base_prompt += f"**Reference {i+1}**: {content[:300]}...\n"
-        
+
         base_prompt += f"""
         ## Evaluation Checklist
         {ChainOfThoughtPrompts.get_self_check_template()}
@@ -223,9 +223,9 @@ class ChainOfThoughtPrompts:
         
         Return your evaluation as JSON with detailed understanding_analysis including explicit "Understanding score: X/10".
         """
-        
+
         return base_prompt
-    
+
     @staticmethod
     def create_enhanced_remediation_prompt(
         concept: Dict[str, Any],
@@ -233,7 +233,7 @@ class ChainOfThoughtPrompts:
         student_profile: Dict[str, Any],
         evaluation: Dict[str, Any],
         context_chunks: List[Dict[str, Any]],
-        **kwargs
+        **kwargs: Any,
     ) -> str:
         """Create enhanced remediation prompt with chain-of-thought."""
         base_prompt = f"""
@@ -261,14 +261,14 @@ class ChainOfThoughtPrompts:
         4. **Connect to Interests**: Use their interests to maintain engagement
         5. **Include Practice**: Give concrete opportunities to apply learning
         """
-        
+
         # Add context if available
         if context_chunks:
             base_prompt += "\n## Educational Resources\n"
             for i, chunk in enumerate(context_chunks[:2]):
-                content = chunk.get('content', str(chunk))
+                content = chunk.get("content", str(chunk))
                 base_prompt += f"**Resource {i+1}**: {content[:300]}...\n"
-        
+
         base_prompt += f"""
         ## Remediation Components
         Create remediation that includes:
@@ -286,5 +286,5 @@ class ChainOfThoughtPrompts:
         
         Return your remediation as JSON with comprehensive content addressing the learning gap.
         """
-        
-        return base_prompt 
+
+        return base_prompt

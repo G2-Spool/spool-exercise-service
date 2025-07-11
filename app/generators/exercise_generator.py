@@ -27,7 +27,12 @@ class ExerciseGenerator:
     def _should_use_mock(self) -> bool:
         """Centralized check for mock exercise usage."""
         key = settings.OPENAI_API_KEY
-        return not key or key == "test_key" or key.startswith("test") or key == "your-openai-api-key"
+        return (
+            not key
+            or key == "test_key"
+            or key.startswith("test")
+            or key == "your-openai-api-key"
+        )
 
     async def generate(
         self,
@@ -127,7 +132,9 @@ class ExerciseGenerator:
                 concept, student_profile, life_category, difficulty, exercise_type
             )
 
-    def _get_system_prompt(self, personality: Optional[str] = None, enhanced: bool = True) -> str:
+    def _get_system_prompt(
+        self, personality: Optional[str] = None, enhanced: bool = True
+    ) -> str:
         """Unified system prompt generator."""
         base_prompt = """
         ## CORE IDENTITY
@@ -166,7 +173,8 @@ class ExerciseGenerator:
         4. Ensure multiple valid solution pathways exist
         5. Create opportunities for student agency and choice within structure"""
 
-        enhanced_block = """
+        enhanced_block = (
+            """
         
         ## ENHANCED CHAIN-OF-THOUGHT PROMPTING
         When creating exercises, follow this enhanced process:
@@ -189,7 +197,10 @@ class ExerciseGenerator:
         ### Step 4: Verify and Refine
         - Ensure the problem requires deep reasoning, not just recall
         - Check that all steps logically build toward mastery
-        - Confirm authentic connection to student interests""" if enhanced else ""
+        - Confirm authentic connection to student interests"""
+            if enhanced
+            else ""
+        )
 
         prompt = base_prompt + enhanced_block
         return personality_loader.apply_personality_to_prompt(prompt, personality)

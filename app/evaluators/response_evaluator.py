@@ -26,11 +26,19 @@ class ResponseEvaluator:
     def _should_use_mock(self) -> bool:
         """Centralized check for mock evaluation usage."""
         key = settings.OPENAI_API_KEY
-        return not key or key == "test_key" or key.startswith("test") or key == "your-openai-api-key"
+        return (
+            not key
+            or key == "test_key"
+            or key.startswith("test")
+            or key == "your-openai-api-key"
+        )
 
     async def evaluate(
-        self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any],
-        use_enhanced_prompts: bool = True
+        self,
+        exercise: Dict[str, Any],
+        student_response: str,
+        concept: Dict[str, Any],
+        use_enhanced_prompts: bool = True,
     ) -> Dict[str, Any]:
         """Evaluate a student's response with enhanced context and chain-of-thought prompting."""
         # Validate response length
@@ -240,7 +248,8 @@ class ResponseEvaluator:
         4. Generate specific, actionable feedback for improvement
         5. Consider multiple valid approaches while maintaining rigor"""
 
-        enhanced_block = """
+        enhanced_block = (
+            """
         
         ## ENHANCED CHAIN-OF-THOUGHT EVALUATION PROCESS
         When evaluating responses, follow this enhanced process:
@@ -270,7 +279,10 @@ class ResponseEvaluator:
         - Highlight strengths and build confidence
         - Suggest next steps for continued learning
         
-        **Critical**: Always show your reasoning process and explicitly state "Understanding score: X/10" in your analysis.""" if enhanced else ""
+        **Critical**: Always show your reasoning process and explicitly state "Understanding score: X/10" in your analysis."""
+            if enhanced
+            else ""
+        )
 
         return base_prompt + enhanced_block
 

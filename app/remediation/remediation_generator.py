@@ -24,7 +24,12 @@ class RemediationGenerator:
     def _should_use_mock(self) -> bool:
         """Centralized check for mock remediation usage."""
         key = settings.OPENAI_API_KEY
-        return not key or key == "test_key" or key.startswith("test") or key == "your-openai-api-key"
+        return (
+            not key
+            or key == "test_key"
+            or key.startswith("test")
+            or key == "your-openai-api-key"
+        )
 
     async def generate(
         self,
