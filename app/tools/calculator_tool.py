@@ -285,7 +285,10 @@ class SecureCalculatorTool:
                     )
 
             if type(node.op) in self.SAFE_OPERATORS:
-                op_func = cast(Callable[[Any, Any], Union[int, float, complex]], self.SAFE_OPERATORS[type(node.op)])
+                op_func = cast(
+                    Callable[[Any, Any], Union[int, float, complex]],
+                    self.SAFE_OPERATORS[type(node.op)],
+                )
                 result = op_func(left, right)
                 if not self._validate_number(result):
                     raise ValueError("Result too large for safe handling")
@@ -295,7 +298,10 @@ class SecureCalculatorTool:
         elif isinstance(node, ast.UnaryOp):
             operand = self._safe_eval(node.operand)
             if type(node.op) in self.SAFE_OPERATORS:
-                unary_op_func = cast(Callable[[Any], Union[int, float, complex]], self.SAFE_OPERATORS[type(node.op)])
+                unary_op_func = cast(
+                    Callable[[Any], Union[int, float, complex]],
+                    self.SAFE_OPERATORS[type(node.op)],
+                )
                 result = unary_op_func(operand)
                 if not self._validate_number(result):
                     raise ValueError("Result too large for safe handling")
@@ -329,7 +335,10 @@ class SecureCalculatorTool:
                                 f"Power exponent too large (max {self.max_power_exponent})"
                             )
 
-                    func = cast(Callable[..., Union[int, float, complex]], self.SAFE_FUNCTIONS[func_name])
+                    func = cast(
+                        Callable[..., Union[int, float, complex]],
+                        self.SAFE_FUNCTIONS[func_name],
+                    )
                     result = func(*args)
                     if not self._validate_number(result):
                         raise ValueError("Function result too large for safe handling")
@@ -445,7 +454,10 @@ class SecureCalculatorTool:
                     x1_complex: complex = complex(real_part, imag_part)
                     x2_complex: complex = complex(real_part, -imag_part)
 
-                    if not (self._validate_number(x1_complex) and self._validate_number(x2_complex)):
+                    if not (
+                        self._validate_number(x1_complex)
+                        and self._validate_number(x2_complex)
+                    ):
                         raise ValueError(
                             "Complex solutions too large for safe handling"
                         )
