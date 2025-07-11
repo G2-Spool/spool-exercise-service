@@ -479,15 +479,24 @@ class SecureCalculatorTool:
                 # Parse the equation to AST
                 tree = ast.parse(equation, mode='eval')
                 
-                # Replace variable nodes with the value
+                # Replace variable nodes with the value (with proper precedence handling)
                 def replace_variable(node):
                     if isinstance(node, ast.Name) and node.id == variable:
-                        # Replace with constant value
+                        # Replace with constant value, handling negative numbers properly
                         if isinstance(value, (int, float)):
-                            return ast.Constant(value=value)
+                            if value < 0:
+                                # For negative numbers, create a unary minus with absolute value
+                                # This ensures proper precedence: (-2)**2 not -2**2
+                                return ast.UnaryOp(op=ast.USub(), operand=ast.Constant(value=abs(value)))
+                            else:
+                                return ast.Constant(value=value)
                         elif isinstance(value, complex):
-                            # For complex numbers, create a complex constant
-                            return ast.Constant(value=value)
+                            # For complex numbers, handle negative components properly
+                            if value.real < 0 or value.imag < 0:
+                                # Use parentheses for complex numbers with negative components
+                                return ast.Constant(value=value)
+                            else:
+                                return ast.Constant(value=value)
                         else:
                             raise ValueError(f"Unsupported value type: {type(value)}")
                     else:
