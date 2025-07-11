@@ -71,16 +71,66 @@ class ResponseEvaluator:
                 raise ValueError("Empty response from OpenAI API")
             evaluation_result = json.loads(content)
 
-            # Extract understanding analysis to determine score and mastery
+            # Retain full raw response for downstream logging/analysis
+            raw_llm_response = content
+            
+            # Use explicit numeric score if provided by the LLM
+            explicit_score = evaluation_result.get("understanding_score")
+            
+            # Also check nested understanding_analysis for score
+            if explicit_score is None:
+                understanding_analysis_obj = evaluation_result.get("understanding_analysis", {})
+                if isinstance(understanding_analysis_obj, dict):
+                    # Check various possible score field names
+                    score_fields = ["Understanding score", "understanding_score", "score", "overall_understanding_score"]
+                    for field in score_fields:
+                        if field in understanding_analysis_obj:
+                            explicit_score = understanding_analysis_obj[field]
+                            break
+            
+            if explicit_score is not None:
+                try:
+                    # Handle string scores like "7/10" or "70%"
+                    if isinstance(explicit_score, str):
+                        explicit_score = explicit_score.strip()
+                        if "/" in explicit_score:
+                            # Handle "7/10" format
+                            parts = explicit_score.split("/")
+                            if len(parts) == 2:
+                                numerator = float(parts[0])
+                                denominator = float(parts[1])
+                                explicit_score = numerator / denominator
+                        elif "%" in explicit_score:
+                            # Handle "70%" format
+                            explicit_score = float(explicit_score.replace("%", "")) / 100
+                        else:
+                            explicit_score = float(explicit_score)
+                    else:
+                        explicit_score = float(explicit_score)
+                    
+                    # Ensure score is in 0-1 range
+                    explicit_score = float(explicit_score)
+                    if explicit_score > 1:
+                        explicit_score = explicit_score / 10 if explicit_score <= 10 else explicit_score / 100
+                    
+                    explicit_score = min(max(explicit_score, 0.0), 1.0)
+                except (ValueError, TypeError):
+                    explicit_score = None
+            
+            # Extract other fields from evaluation_result (fallback safe access)
             understanding_analysis = evaluation_result.get("understanding_analysis", "")
             process_evaluation = evaluation_result.get("process_evaluation", "")
             growth_feedback = evaluation_result.get("growth_feedback", "")
             strength_identification = evaluation_result.get("strength_identification", "")
             next_steps = evaluation_result.get("next_steps", "")
 
-            # Parse the understanding analysis to extract score and determine mastery
-            understanding_score = self._extract_understanding_score(understanding_analysis, process_evaluation)
-            mastery_achieved = understanding_score >= 0.8  # 80% threshold for mastery
+            # Determine understanding score
+            if explicit_score is not None:
+                understanding_score = explicit_score
+            else:
+                understanding_score = self._extract_understanding_score(understanding_analysis, process_evaluation)
+            
+            mastery_achieved = understanding_score >= 0.8  # 80% threshold
             
             # Extract step analysis from the detailed feedback
             correct_steps, missing_steps, incorrect_steps = self._extract_step_analysis(
@@ -103,6 +153,8 @@ class ResponseEvaluator:
                 "feedback": f"{growth_feedback}\n\nStrengths: {strength_identification}\n\nNext Steps: {next_steps}",
                 "needs_remediation": not mastery_achieved,
                 "understanding_gaps": missing_steps,
+                "llm_response": evaluation_result,  # full parsed JSON
+                "llm_response_raw": raw_llm_response,
                 "evaluated_at": datetime.utcnow().isoformat(),
             }
 
