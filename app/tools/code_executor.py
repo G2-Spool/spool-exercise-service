@@ -230,9 +230,20 @@ if __name__ == "__main__":
                 elif isinstance(node, (ast.Global, ast.Nonlocal)):
                     return False
                 
-                # Block function definitions (to prevent complex exploits)
+                # Allow simple lambdas, but block function/class definitions
                 elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     return False
+                
+                # Restrict lambdas to only safe names and expressions
+                elif isinstance(node, ast.Lambda):
+                    for subnode in ast.walk(node):
+                        if isinstance(subnode, ast.Name):
+                            if subnode.id in ['eval', 'exec', 'compile', '__import__', 'open', 'input']:
+                                return False
+                        elif isinstance(subnode, ast.Attribute):
+                            if (isinstance(subnode.attr, str) and 
+                                (subnode.attr.startswith('__') or subnode.attr in ['globals', 'locals'])):
+                                return False
             
             return True
             
