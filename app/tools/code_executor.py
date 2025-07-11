@@ -17,6 +17,8 @@ logger = structlog.get_logger()
 class SecureCodeExecutor:
     """Secure Python code executor with proper sandboxing and resource limits."""
 
+    secure_python_script: Optional[str]
+
     def __init__(self, timeout: int = 5, max_memory_mb: int = 50):
         self.timeout = timeout
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
@@ -432,7 +434,7 @@ if __name__ == "__main__":
                 }
 
             # Enhanced process isolation
-            def setup_subprocess():
+            def setup_subprocess() -> None:
                 """Set up subprocess with enhanced security."""
                 if os.name != "nt":
                     # Create new process group for better isolation
@@ -460,7 +462,7 @@ if __name__ == "__main__":
 
                 if process.returncode == 0:
                     try:
-                        result = json.loads(stdout)
+                        result: Dict[str, Any] = json.loads(stdout)
                         result["execution_time"] = execution_time
                         return result
                     except json.JSONDecodeError:
@@ -517,7 +519,7 @@ if __name__ == "__main__":
         try:
             # Safely validate and embed test input
             if not isinstance(test_input, (str, int, float, bool, list, dict, tuple)):
-                return {
+                return {  # type: ignore[unreachable]
                     "success": False,
                     "error": "Invalid test input type",
                     "test_passed": False,
@@ -662,7 +664,7 @@ if __name__ == "__main__":
         - run_test_case("print(test_input * 2)", 5, "10") → validation
         """
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Cleanup temporary files with robust error handling."""
         try:
             if hasattr(self, "secure_python_script") and self.secure_python_script:
@@ -675,7 +677,7 @@ if __name__ == "__main__":
         except Exception as e:
             logger.warning("Failed to cleanup secure Python wrapper", error=str(e))
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Explicit cleanup method for better resource management."""
         try:
             if hasattr(self, "secure_python_script") and self.secure_python_script:

@@ -61,7 +61,7 @@ class SecureCalculatorTool:
         self.max_factorial_input = 1000  # Factorial grows very quickly
         self.max_power_exponent = 1000  # Prevent huge exponentiations
 
-    def _set_resource_limits(self):
+    def _set_resource_limits(self) -> None:
         """Set memory and CPU limits for the calculation."""
         try:
             # Set memory limit
@@ -77,11 +77,11 @@ class SecureCalculatorTool:
             # Some systems may not support all limits
             pass
 
-    def _execute_with_timeout(self, func, *args, **kwargs):
+    def _execute_with_timeout(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         """Execute function with timeout using threading (cross-platform)."""
         result: Dict[str, Any] = {"value": None, "error": None}
 
-        def target():
+        def target() -> None:
             try:
                 result["value"] = func(*args, **kwargs)
             except Exception as e:
@@ -128,7 +128,7 @@ class SecureCalculatorTool:
             max_depth = 0
             node_count = 0
 
-            def analyze_node(node, depth=0):
+            def analyze_node(node: ast.AST, depth: int = 0) -> bool:
                 nonlocal max_depth, node_count
                 max_depth = max(max_depth, depth)
                 node_count += 1
@@ -216,7 +216,7 @@ class SecureCalculatorTool:
             self._set_resource_limits()
 
             # Execute with timeout protection using threading
-            def _do_calculation():
+            def _do_calculation() -> Dict[str, Any]:
                 # Parse the expression
                 tree = ast.parse(expression, mode="eval")
 
@@ -376,7 +376,7 @@ class SecureCalculatorTool:
             self._set_resource_limits()
 
             # Execute with timeout protection using threading
-            def _do_quadratic_solve():
+            def _do_quadratic_solve() -> Dict[str, Any]:
                 if a == 0:
                     if b == 0:
                         raise ValueError("Not a valid equation (both a and b are zero)")
@@ -515,7 +515,7 @@ class SecureCalculatorTool:
                 tree = ast.parse(equation, mode="eval")
 
                 # Replace variable nodes with the value (with proper precedence handling)
-                def replace_variable(node):
+                def replace_variable(node: ast.AST) -> ast.AST:
                     if isinstance(node, ast.Name) and node.id == variable:
                         # Replace with constant value, handling negative numbers properly
                         if isinstance(value, (int, float)):
