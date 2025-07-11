@@ -4,6 +4,32 @@
 
 Successfully implemented **Chain-of-Thought Prompting Strategies** and **Tool Use Recommendations** to make the Spool Exercise Service more responsive and accurate as requested.
 
+## 🚀 **Latest Update: System Prompt Architecture Refactoring**
+
+**Complete refactoring of system prompt generation architecture** for improved maintainability and consistency:
+
+### **Key Improvements**
+- ✅ **Centralized Fallback Logic**: Unified `_should_use_mock()` method across all generators
+- ✅ **Unified System Prompt Generation**: Single `_get_system_prompt()` method with conditional enhanced features
+- ✅ **Consolidated Prompt Building**: Single `_build_prompt()` method per generator replacing multiple specialized methods
+- ✅ **Enhanced Features Handling**: Clear boolean parameter controls enhanced features
+- ✅ **Type Safety**: Proper `Optional` type annotations for all optional parameters
+- ✅ **Code Reduction**: Reduced method count from 6-8 to 4-5 methods per class
+
+### **Architecture Benefits**
+- **Maintainability**: Consistent structure across all three generators
+- **Flexibility**: Easy to add new features and modify existing ones
+- **Reliability**: Centralized fallback logic and error handling
+- **Performance**: Reduced code duplication and method calls
+- **Type Safety**: Proper type annotations throughout
+
+### **Affected Components**
+- **Exercise Generator**: Unified prompt generation with personality injection
+- **Response Evaluator**: Consolidated evaluation prompts with enhanced features
+- **Remediation Generator**: Streamlined remediation prompt building
+
+> **Documentation**: See `docs/SYSTEM_PROMPT_ARCHITECTURE.md` for detailed implementation guide
+
 ## ✅ Implemented Features
 
 ### 1. **Chain-of-Thought Prompting Strategies**
