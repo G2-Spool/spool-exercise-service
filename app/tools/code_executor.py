@@ -1,159 +1,211 @@
-"""Safe code execution tool for educational purposes."""
+"""Secure code execution tool for educational purposes."""
 
 import ast
-import io
-import sys
-import contextlib
+import subprocess
+import tempfile
+import os
+import signal
+import resource
 import time
+import json
+import sys
 from typing import Dict, Any, List, Optional
+from pathlib import Path
 import structlog
 
 logger = structlog.get_logger()
 
 
-class CodeExecutor:
-    """Safe Python code executor for educational purposes."""
+class SecureCodeExecutor:
+    """Secure Python code executor with proper sandboxing and resource limits."""
     
-    def __init__(self, timeout: int = 5):
+    def __init__(self, timeout: int = 5, max_memory_mb: int = 50):
         self.timeout = timeout
+        self.max_memory_bytes = max_memory_mb * 1024 * 1024
         self.enabled = True
         
-        # Define allowed built-ins for safety
-        self.safe_builtins = {
-            'abs': abs,
-            'all': all,
-            'any': any,
-            'bin': bin,
-            'bool': bool,
-            'chr': chr,
-            'dict': dict,
-            'enumerate': enumerate,
-            'filter': filter,
-            'float': float,
-            'hex': hex,
-            'int': int,
-            'isinstance': isinstance,
-            'len': len,
-            'list': list,
-            'map': map,
-            'max': max,
-            'min': min,
-            'oct': oct,
-            'ord': ord,
-            'pow': pow,
-            'range': range,
-            'reversed': reversed,
-            'round': round,
-            'set': set,
-            'sorted': sorted,
-            'str': str,
-            'sum': sum,
-            'tuple': tuple,
-            'type': type,
-            'zip': zip,
-            'print': print,
-        }
+        # Create secure Python executable wrapper
+        self.secure_python_script = self._create_secure_python_wrapper()
         
-        # Allowed modules
+        # Allowed modules (very restrictive)
         self.safe_modules = {
-            'math': __import__('math'),
-            'random': __import__('random'),
-            'datetime': __import__('datetime'),
-            'json': __import__('json'),
-            're': __import__('re'),
+            'math', 'random', 'datetime', 'json', 're', 'string', 'itertools',
+            'functools', 'operator', 'collections', 'heapq', 'bisect'
         }
-    
-    def execute_code(self, code: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Execute Python code safely with output capture.
         
-        Args:
-            code: Python code to execute
-            context: Optional context variables
-            
-        Returns:
-            Dictionary with execution results
-        """
+        # Blocked patterns that should never appear in code
+        self.blocked_patterns = [
+            '__import__', 'eval', 'exec', 'compile', 'globals', 'locals',
+            'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr',
+            'open', 'file', 'input', 'raw_input', '__builtins__',
+            'subprocess', 'os.', 'sys.', 'import os', 'import sys',
+            '__class__', '__bases__', '__subclasses__', '__mro__',
+            'func_globals', 'gi_frame', 'f_locals', 'f_globals'
+        ]
+    
+    def _create_secure_python_wrapper(self) -> str:
+        """Create a secure Python wrapper script for isolated execution."""
+        wrapper_content = '''
+import sys
+import json
+import signal
+import resource
+import traceback
+from io import StringIO
+
+def set_resource_limits():
+    """Set strict resource limits."""
+    try:
+        # Memory limit
+        max_memory = {max_memory}
+        resource.setrlimit(resource.RLIMIT_AS, (max_memory, max_memory))
+        
+        # CPU time limit (seconds)
+        resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
+        
+        # File operations limit (no file creation)
+        resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
+        
+        # Process limit (no forking)
+        resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
+    except (ValueError, OSError):
+        pass  # Some limits may not be available on all systems
+
+def timeout_handler(signum, frame):
+    """Handle timeout signal."""
+    raise TimeoutError("Code execution timed out")
+
+def secure_exec(code_string):
+    """Execute code in a secure environment."""
+    # Set up timeout
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm({timeout})
+    
+    # Set resource limits
+    set_resource_limits()
+    
+    # Restricted builtins
+    safe_builtins = {{
+        'abs': abs, 'all': all, 'any': any, 'bin': bin, 'bool': bool,
+        'chr': chr, 'dict': dict, 'enumerate': enumerate, 'filter': filter,
+        'float': float, 'hex': hex, 'int': int, 'isinstance': isinstance,
+        'len': len, 'list': list, 'map': map, 'max': max, 'min': min,
+        'oct': oct, 'ord': ord, 'pow': pow, 'range': range, 'reversed': reversed,
+        'round': round, 'set': set, 'sorted': sorted, 'str': str, 'sum': sum,
+        'tuple': tuple, 'type': type, 'zip': zip, 'print': print
+    }}
+    
+    # Allowed modules
+    safe_modules = {safe_modules}
+    for module_name in safe_modules:
         try:
-            # Validate code safety
-            if not self._is_safe_code(code):
-                return {
-                    'success': False,
-                    'error': 'Code contains unsafe operations'
-                }
-            
-            # Prepare execution environment
-            exec_globals = {
-                '__builtins__': self.safe_builtins,
-                **self.safe_modules
-            }
-            
-            if context:
-                exec_globals.update(context)
-            
-            # Capture output
-            old_stdout = sys.stdout
-            old_stderr = sys.stderr
-            stdout_capture = io.StringIO()
-            stderr_capture = io.StringIO()
-            
-            try:
-                sys.stdout = stdout_capture
-                sys.stderr = stderr_capture
-                
-                # Execute with timeout
-                start_time = time.time()
-                local_vars = {}
-                
-                # Try to execute as expression first, then as statement
-                try:
-                    # Try as expression
-                    result = eval(code, exec_globals, local_vars)
-                    execution_type = 'expression'
-                except SyntaxError:
-                    # Execute as statement
-                    exec(code, exec_globals, local_vars)
-                    result = None
-                    execution_type = 'statement'
-                
-                end_time = time.time()
-                
-                # Get output
-                stdout_output = stdout_capture.getvalue()
-                stderr_output = stderr_capture.getvalue()
-                
-                return {
-                    'success': True,
-                    'result': result,
-                    'execution_type': execution_type,
-                    'stdout': stdout_output,
-                    'stderr': stderr_output,
-                    'execution_time': end_time - start_time,
-                    'variables': {k: v for k, v in local_vars.items() if not k.startswith('__')}
-                }
-                
-            finally:
-                sys.stdout = old_stdout
-                sys.stderr = old_stderr
-                
-        except Exception as e:
-            logger.error("Code execution error", code=code[:100], error=str(e))
-            return {
-                'success': False,
-                'error': str(e),
-                'code': code[:100] + '...' if len(code) > 100 else code
-            }
+            safe_builtins[module_name] = __import__(module_name)
+        except ImportError:
+            pass
+    
+    # Capture output
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    stdout_capture = StringIO()
+    stderr_capture = StringIO()
+    
+    result = None
+    execution_type = "statement"
+    
+    try:
+        sys.stdout = stdout_capture
+        sys.stderr = stderr_capture
+        
+        # Create isolated execution environment
+        exec_globals = {{"__builtins__": safe_builtins}}
+        exec_locals = {{}}
+        
+        # Try as expression first
+        try:
+            # Compile as expression to check if it's a simple expression
+            compile(code_string, '<string>', 'eval')
+            result = eval(code_string, exec_globals, exec_locals)
+            execution_type = "expression"
+        except SyntaxError:
+            # Execute as statement
+            exec(code_string, exec_globals, exec_locals)
+            execution_type = "statement"
+        
+        # Get output
+        stdout_output = stdout_capture.getvalue()
+        stderr_output = stderr_capture.getvalue()
+        
+        return {{
+            'success': True,
+            'result': str(result) if result is not None else None,
+            'execution_type': execution_type,
+            'stdout': stdout_output,
+            'stderr': stderr_output,
+            'variables': {{k: str(v) for k, v in exec_locals.items() if not k.startswith('__')}}
+        }}
+        
+    except TimeoutError:
+        return {{'success': False, 'error': 'Code execution timed out'}}
+    except MemoryError:
+        return {{'success': False, 'error': 'Code exceeded memory limit'}}
+    except Exception as e:
+        return {{'success': False, 'error': str(e), 'traceback': traceback.format_exc()}}
+    finally:
+        signal.alarm(0)  # Cancel timeout
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print(json.dumps({{'success': False, 'error': 'Invalid arguments'}}))
+        sys.exit(1)
+    
+    code_to_execute = sys.argv[1]
+    result = secure_exec(code_to_execute)
+    print(json.dumps(result))
+'''.format(
+            timeout=self.timeout,
+            max_memory=self.max_memory_bytes,
+            safe_modules=repr(self.safe_modules)
+        )
+        
+        # Write wrapper to temporary file
+        wrapper_fd, wrapper_path = tempfile.mkstemp(suffix='.py', prefix='secure_exec_')
+        try:
+            with os.fdopen(wrapper_fd, 'w') as f:
+                f.write(wrapper_content)
+        except:
+            os.close(wrapper_fd)
+            raise
+        
+        return wrapper_path
     
     def _is_safe_code(self, code: str) -> bool:
-        """Check if code is safe to execute."""
+        """Enhanced safety check for code."""
+        # Check for blocked patterns
+        code_lower = code.lower()
+        for pattern in self.blocked_patterns:
+            if pattern in code_lower:
+                return False
+        
+        # Check for dangerous escape sequences
+        dangerous_sequences = [
+            '\\x', '\\u', '\\U',  # Unicode/hex escapes that could hide code
+            'chr(', 'ord(',       # Character manipulation
+            'bytes(', 'bytearray(',  # Byte manipulation
+        ]
+        
+        for seq in dangerous_sequences:
+            if seq in code_lower:
+                return False
+        
         try:
-            # Parse the code
+            # Parse AST for deeper analysis
             tree = ast.parse(code)
             
-            # Check for unsafe operations
             for node in ast.walk(tree):
+                # Block any imports not in safe list
                 if isinstance(node, (ast.Import, ast.ImportFrom)):
-                    # Check if importing allowed modules
                     if isinstance(node, ast.Import):
                         for alias in node.names:
                             if alias.name not in self.safe_modules:
@@ -162,21 +214,24 @@ class CodeExecutor:
                         if node.module not in self.safe_modules:
                             return False
                 
+                # Block dangerous function calls
                 elif isinstance(node, ast.Call):
-                    # Check function calls
                     if isinstance(node.func, ast.Name):
-                        func_name = node.func.id
-                        # Block dangerous functions
-                        if func_name in ['exec', 'eval', 'compile', 'open', '__import__', 'globals', 'locals', 'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr']:
+                        if node.func.id in ['eval', 'exec', 'compile', '__import__']:
                             return False
                 
+                # Block attribute access to dangerous attributes
                 elif isinstance(node, ast.Attribute):
-                    # Block access to certain attributes
-                    if isinstance(node.attr, str) and node.attr.startswith('__'):
+                    if (isinstance(node.attr, str) and 
+                        (node.attr.startswith('__') or node.attr in ['globals', 'locals'])):
                         return False
                 
+                # Block global/nonlocal declarations
                 elif isinstance(node, (ast.Global, ast.Nonlocal)):
-                    # Block global/nonlocal declarations
+                    return False
+                
+                # Block function definitions (to prevent complex exploits)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     return False
             
             return True
@@ -184,22 +239,112 @@ class CodeExecutor:
         except SyntaxError:
             return False
     
+    def execute_code(self, code: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Execute Python code securely with proper isolation and limits.
+        
+        Args:
+            code: Python code to execute
+            context: Optional context variables (ignored for security)
+            
+        Returns:
+            Dictionary with execution results
+        """
+        if not self.enabled:
+            return {'success': False, 'error': 'Code executor is disabled'}
+        
+        # Enhanced safety check
+        if not self._is_safe_code(code):
+            return {
+                'success': False,
+                'error': 'Code contains unsafe operations or patterns'
+            }
+        
+        # Additional length check
+        if len(code) > 2000:
+            return {
+                'success': False,
+                'error': 'Code is too long (max 2000 characters)'
+            }
+        
+        try:
+            # Execute in isolated subprocess
+            start_time = time.time()
+            
+            process = subprocess.Popen(
+                [sys.executable, self.secure_python_script, code],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                preexec_fn=os.setsid if os.name != 'nt' else None  # Create new process group
+            )
+            
+            try:
+                stdout, stderr = process.communicate(timeout=self.timeout + 1)
+                execution_time = time.time() - start_time
+                
+                if process.returncode == 0:
+                    try:
+                        result = json.loads(stdout)
+                        result['execution_time'] = execution_time
+                        return result
+                    except json.JSONDecodeError:
+                        return {
+                            'success': False,
+                            'error': 'Invalid response from secure executor',
+                            'raw_output': stdout[:500]
+                        }
+                else:
+                    return {
+                        'success': False,
+                        'error': f'Execution failed with code {process.returncode}',
+                        'stderr': stderr[:500]
+                    }
+                    
+            except subprocess.TimeoutExpired:
+                # Kill the process group to ensure cleanup
+                if os.name != 'nt':
+                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                else:
+                    process.terminate()
+                
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    if os.name != 'nt':
+                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    else:
+                        process.kill()
+                
+                return {
+                    'success': False,
+                    'error': f'Code execution timed out after {self.timeout} seconds'
+                }
+                
+        except Exception as e:
+            logger.error("Secure code execution error", error=str(e))
+            return {
+                'success': False,
+                'error': f'Execution system error: {str(e)}'
+            }
+    
     def run_test_case(self, code: str, test_input: str, expected_output: str) -> Dict[str, Any]:
         """
         Run code with test input and compare output.
         
         Args:
             code: Code to test
-            test_input: Input for the code
+            test_input: Input for the code (embedded as variable)
             expected_output: Expected output
             
         Returns:
             Dictionary with test results
         """
         try:
-            # Execute code with test input
-            context = {'input_data': test_input}
-            result = self.execute_code(code, context)
+            # Embed test input as a variable in the code
+            test_code = f"test_input = {repr(test_input)}\\n{code}"
+            
+            result = self.execute_code(test_code)
             
             if not result['success']:
                 return {
@@ -209,7 +354,7 @@ class CodeExecutor:
                 }
             
             # Compare output
-            actual_output = result['stdout'].strip()
+            actual_output = result.get('stdout', '').strip()
             test_passed = actual_output == expected_output.strip()
             
             return {
@@ -217,12 +362,11 @@ class CodeExecutor:
                 'test_passed': test_passed,
                 'actual_output': actual_output,
                 'expected_output': expected_output,
-                'execution_time': result['execution_time'],
-                'variables': result['variables']
+                'execution_time': result.get('execution_time', 0)
             }
             
         except Exception as e:
-            logger.error("Test execution error", code=code[:100], error=str(e))
+            logger.error("Test execution error", error=str(e))
             return {
                 'success': False,
                 'error': str(e),
@@ -270,26 +414,47 @@ class CodeExecutor:
         }
     
     def get_tool_description(self) -> str:
-        """Get description of code executor tool capabilities."""
-        return """
-        Code Executor Tool - Available for Python code execution:
+        """Get description of secure code executor capabilities."""
+        return f"""
+        Secure Code Executor Tool - Safe Python code execution with strict limits:
+        
+        **Security Features:**
+        - Process isolation with subprocess execution
+        - Real timeout enforcement ({self.timeout}s)
+        - Memory limits ({self.max_memory_bytes // (1024*1024)}MB)
+        - CPU time limits (10s)
+        - No file system access
+        - Restricted module imports
+        - Enhanced AST-based code analysis
         
         **Functions:**
-        - execute_code(code, context=None): Execute Python code safely
+        - execute_code(code): Execute Python code safely
         - run_test_case(code, input, expected): Test code with specific input
         - validate_solution(code, test_cases): Validate against multiple test cases
         
-        **Safety Features:**
-        - Sandboxed execution environment
-        - Limited built-in functions
-        - Restricted module imports
-        - Output capture and timeout protection
-        
         **Allowed Modules:**
-        - math, random, datetime, json, re
+        - {', '.join(sorted(self.safe_modules))}
+        
+        **Safety Restrictions:**
+        - No eval, exec, compile, __import__
+        - No file operations or system access
+        - No dangerous attribute access
+        - No function/class definitions
+        - Limited to simple computational tasks
         
         **Examples:**
-        - execute_code("2 + 3 * 4") → result: 14
-        - run_test_case("print(x)", "5", "5") → test validation
-        - validate_solution(code, [{"input": "5", "expected": "25"}])
-        """ 
+        - execute_code("print(2 + 3)") → output: "5"
+        - run_test_case("print(x*2)", "5", "10") → validation
+        """
+    
+    def __del__(self):
+        """Cleanup temporary files."""
+        try:
+            if hasattr(self, 'secure_python_script') and os.path.exists(self.secure_python_script):
+                os.unlink(self.secure_python_script)
+        except:
+            pass
+
+
+# Backward compatibility alias
+CodeExecutor = SecureCodeExecutor 

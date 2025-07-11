@@ -2,7 +2,7 @@
 
 from typing import Dict, Any, List, Optional
 from .calculator_tool import CalculatorTool
-from .code_executor import CodeExecutor
+from .code_executor import SecureCodeExecutor
 from .search_tool import SearchTool
 import structlog
 
@@ -14,7 +14,7 @@ class ToolManager:
     
     def __init__(self):
         self.calculator = CalculatorTool()
-        self.code_executor = CodeExecutor()
+        self.code_executor = SecureCodeExecutor()
         self.search_tool = SearchTool()
         self.tools_enabled = True
         
@@ -152,9 +152,12 @@ class ToolManager:
                     kwargs.get('limit', 2)
                 )
             elif operation == 'comprehensive_search':
+                student_interests = kwargs.get('student_interests')
+                if student_interests is None:
+                    student_interests = []
                 return await self.search_tool.comprehensive_search(
                     kwargs.get('concept_name', ''),
-                    kwargs.get('student_interests'),
+                    student_interests,
                     kwargs.get('difficulty', 'basic')
                 )
             else:
@@ -164,7 +167,7 @@ class ToolManager:
             return {'success': False, 'error': str(e)}
     
     def create_tool_enhanced_prompt(self, base_prompt: str, concept_name: str, 
-                                  student_interests: List[str] = None, 
+                                  student_interests: Optional[List[str]] = None, 
                                   enable_calculator: bool = True,
                                   enable_code_executor: bool = True,
                                   enable_search: bool = True) -> str:
