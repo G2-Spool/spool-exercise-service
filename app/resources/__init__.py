@@ -1,1 +1,1 @@
-"""Resources package for the exercise service.""" 
+"""Resources package for the exercise service."""

@@ -30,9 +30,9 @@ class ResponseEvaluator:
             context_chunks = await self.pinecone_service.get_concept_context(
                 concept.get("name", ""),
                 [],  # No interests needed for evaluation
-                "basic"
+                "basic",
             )
-            
+
             # Validate response length
             if len(student_response) < settings.MIN_RESPONSE_LENGTH:
                 return self._create_insufficient_response_evaluation(
@@ -54,7 +54,9 @@ class ResponseEvaluator:
                     exercise, student_response, concept, context_chunks
                 )
             else:
-                prompt = self._create_evaluation_prompt(exercise, student_response, concept)
+                prompt = self._create_evaluation_prompt(
+                    exercise, student_response, concept
+                )
 
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -73,21 +75,28 @@ class ResponseEvaluator:
 
             # Retain full raw response for downstream logging/analysis
             raw_llm_response = content
-            
+
             # Use explicit numeric score if provided by the LLM
             explicit_score = evaluation_result.get("understanding_score")
-            
+
             # Also check nested understanding_analysis for score
             if explicit_score is None:
-                understanding_analysis_obj = evaluation_result.get("understanding_analysis", {})
+                understanding_analysis_obj = evaluation_result.get(
+                    "understanding_analysis", {}
+                )
                 if isinstance(understanding_analysis_obj, dict):
                     # Check various possible score field names
-                    score_fields = ["Understanding score", "understanding_score", "score", "overall_understanding_score"]
+                    score_fields = [
+                        "Understanding score",
+                        "understanding_score",
+                        "score",
+                        "overall_understanding_score",
+                    ]
                     for field in score_fields:
                         if field in understanding_analysis_obj:
                             explicit_score = understanding_analysis_obj[field]
                             break
-            
+
             if explicit_score is not None:
                 try:
                     # Handle string scores like "7/10" or "70%"
@@ -102,12 +111,14 @@ class ResponseEvaluator:
                                 explicit_score = numerator / denominator
                         elif "%" in explicit_score:
                             # Handle "70%" format
-                            explicit_score = float(explicit_score.replace("%", "")) / 100
+                            explicit_score = (
+                                float(explicit_score.replace("%", "")) / 100
+                            )
                         else:
                             explicit_score = float(explicit_score)
                     else:
                         explicit_score = float(explicit_score)
-                    
+
                     # Ensure score is in 0-1 range
                     explicit_score = float(explicit_score)
                     # Only normalize if score is actually > 1 (not already normalized)
@@ -116,29 +127,35 @@ class ResponseEvaluator:
                             explicit_score = explicit_score / 10  # 8 -> 0.8
                         else:
                             explicit_score = explicit_score / 100  # 80 -> 0.8
-                    
+
                     explicit_score = min(max(explicit_score, 0.0), 1.0)
                 except (ValueError, TypeError):
                     explicit_score = None
-            
+
             # Extract other fields from evaluation_result (fallback safe access)
             understanding_analysis = evaluation_result.get("understanding_analysis", "")
             process_evaluation = evaluation_result.get("process_evaluation", "")
             growth_feedback = evaluation_result.get("growth_feedback", "")
-            strength_identification = evaluation_result.get("strength_identification", "")
+            strength_identification = evaluation_result.get(
+                "strength_identification", ""
+            )
             next_steps = evaluation_result.get("next_steps", "")
 
             # Determine understanding score
             if explicit_score is not None:
                 understanding_score = explicit_score
             else:
-                understanding_score = self._extract_understanding_score(understanding_analysis, process_evaluation)
-            
+                understanding_score = self._extract_understanding_score(
+                    understanding_analysis, process_evaluation
+                )
+
             mastery_achieved = understanding_score >= 0.8  # 80% threshold
-            
+
             # Extract step analysis from the detailed feedback
             correct_steps, missing_steps, incorrect_steps = self._extract_step_analysis(
-                understanding_analysis, process_evaluation, exercise.get("expected_steps", [])
+                understanding_analysis,
+                process_evaluation,
+                exercise.get("expected_steps", []),
             )
 
             # Create evaluation object
@@ -266,19 +283,22 @@ class ResponseEvaluator:
 
         return evaluation
 
-    def _extract_understanding_score(self, understanding_analysis: str, process_evaluation: str) -> float:
+    def _extract_understanding_score(
+        self, understanding_analysis: str, process_evaluation: str
+    ) -> float:
         """Extract understanding score from LLM analysis."""
         combined_text = f"{understanding_analysis} {process_evaluation}".lower()
-        
+
         # Look for explicit score mentions
         import re
+
         score_patterns = [
-            r'score[:\s]*(\d+(?:\.\d+)?)',
-            r'understanding[:\s]*(\d+(?:\.\d+)?)',
-            r'(\d+(?:\.\d+)?)[/\s]*(?:out of|/)?\s*(?:10|1\.0|1)',
-            r'(\d+(?:\.\d+)?)%'
+            r"score[:\s]*(\d+(?:\.\d+)?)",
+            r"understanding[:\s]*(\d+(?:\.\d+)?)",
+            r"(\d+(?:\.\d+)?)[/\s]*(?:out of|/)?\s*(?:10|1\.0|1)",
+            r"(\d+(?:\.\d+)?)%",
         ]
-        
+
         for pattern in score_patterns:
             match = re.search(pattern, combined_text)
             if match:
@@ -290,14 +310,34 @@ class ResponseEvaluator:
                     else:
                         score = score / 100  # 90 -> 0.9 (out of 100)
                 return min(score, 1.0)
-        
+
         # Fallback: analyze quality indicators
-        positive_indicators = ['correct', 'accurate', 'good', 'excellent', 'demonstrates', 'shows', 'understands']
-        negative_indicators = ['incorrect', 'wrong', 'missing', 'lacks', 'fails', 'confused', 'unclear']
-        
-        positive_count = sum(1 for indicator in positive_indicators if indicator in combined_text)
-        negative_count = sum(1 for indicator in negative_indicators if indicator in combined_text)
-        
+        positive_indicators = [
+            "correct",
+            "accurate",
+            "good",
+            "excellent",
+            "demonstrates",
+            "shows",
+            "understands",
+        ]
+        negative_indicators = [
+            "incorrect",
+            "wrong",
+            "missing",
+            "lacks",
+            "fails",
+            "confused",
+            "unclear",
+        ]
+
+        positive_count = sum(
+            1 for indicator in positive_indicators if indicator in combined_text
+        )
+        negative_count = sum(
+            1 for indicator in negative_indicators if indicator in combined_text
+        )
+
         if positive_count > negative_count:
             return 0.8 + (positive_count - negative_count) * 0.05
         elif negative_count > positive_count:
@@ -305,27 +345,38 @@ class ResponseEvaluator:
         else:
             return 0.6
 
-    def _extract_step_analysis(self, understanding_analysis: str, process_evaluation: str, expected_steps: List[str]) -> tuple:
+    def _extract_step_analysis(
+        self,
+        understanding_analysis: str,
+        process_evaluation: str,
+        expected_steps: List[str],
+    ) -> tuple:
         """Extract step analysis from LLM feedback."""
         combined_text = f"{understanding_analysis} {process_evaluation}".lower()
-        
+
         correct_steps = []
         missing_steps = []
         incorrect_steps = []
-        
+
         # Analyze each expected step
         for step in expected_steps:
             step_lower = step.lower()
             key_words = step_lower.split()[:3]  # First 3 words as key indicators
-            
+
             # Check if step is mentioned positively
             step_mentioned = any(word in combined_text for word in key_words)
-            
+
             if step_mentioned:
                 # Look for positive or negative context
-                positive_context = any(pos in combined_text for pos in ['correct', 'good', 'demonstrates', 'shows'])
-                negative_context = any(neg in combined_text for neg in ['missing', 'lacks', 'incorrect', 'wrong'])
-                
+                positive_context = any(
+                    pos in combined_text
+                    for pos in ["correct", "good", "demonstrates", "shows"]
+                )
+                negative_context = any(
+                    neg in combined_text
+                    for neg in ["missing", "lacks", "incorrect", "wrong"]
+                )
+
                 if positive_context and not negative_context:
                     correct_steps.append(f"Demonstrated: {step}")
                 elif negative_context:
@@ -334,7 +385,7 @@ class ResponseEvaluator:
                     correct_steps.append(f"Partially addressed: {step}")
             else:
                 missing_steps.append(f"Missing: {step}")
-        
+
         return correct_steps, missing_steps, incorrect_steps
 
     def _get_system_prompt(self) -> str:
@@ -416,11 +467,11 @@ class ResponseEvaluator:
         exercise: Dict[str, Any],
         student_response: str,
         concept: Dict[str, Any],
-        context_chunks: List[Dict[str, Any]]
+        context_chunks: List[Dict[str, Any]],
     ) -> str:
         """Create enhanced evaluation prompt with context."""
         expected_steps = exercise.get("expected_steps", [])
-        
+
         prompt = f"""Evaluate this student's response to an exercise:
         
         Concept Being Tested: {concept.get('name')}
@@ -434,17 +485,17 @@ class ResponseEvaluator:
         Student's Response:
         "{student_response}"
         """
-        
+
         # Add context for more accurate evaluation
         if context_chunks:
             prompt += "\n\nAdditional Context for Evaluation:\n"
             for i, chunk in enumerate(context_chunks[:2]):
-                content = chunk.get('content', '')
+                content = chunk.get("content", "")
                 if isinstance(content, str):
                     prompt += f"Context {i+1}: {content[:300]}...\n"
                 else:
                     prompt += f"Context {i+1}: {str(content)[:300]}...\n"
-        
+
         prompt += """
         Evaluation Criteria:
         1. Has the student demonstrated understanding of each expected step?
@@ -456,7 +507,7 @@ class ResponseEvaluator:
         
         Score their overall understanding from 0.0 to 1.0.
         Mastery is achieved ONLY if they explain ALL key steps correctly."""
-        
+
         return prompt
 
     def _create_insufficient_response_evaluation(

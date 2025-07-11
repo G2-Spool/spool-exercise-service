@@ -35,9 +35,9 @@ class RemediationGenerator:
             remediation_examples = await self.pinecone_service.get_remediation_examples(
                 target_gap,
                 concept.get("name", ""),
-                student_profile.get("interests", [])
+                student_profile.get("interests", []),
             )
-            
+
             # Check if using test key or no key - create mock remediation
             if (
                 not settings.OPENAI_API_KEY
@@ -52,8 +52,12 @@ class RemediationGenerator:
             # Create enhanced prompt with examples if available, otherwise use standard prompt
             if remediation_examples:
                 prompt = self._create_enhanced_remediation_prompt(
-                    concept, target_gap, student_profile, original_exercise, evaluation,
-                    remediation_examples
+                    concept,
+                    target_gap,
+                    student_profile,
+                    original_exercise,
+                    evaluation,
+                    remediation_examples,
                 )
             else:
                 prompt = self._create_remediation_prompt(
@@ -254,7 +258,7 @@ class RemediationGenerator:
         student_profile: Dict[str, Any],
         original_exercise: Dict[str, Any],
         evaluation: Dict[str, Any],
-        remediation_examples: List[Dict[str, Any]]
+        remediation_examples: List[Dict[str, Any]],
     ) -> str:
         """Create enhanced remediation prompt with examples."""
         interests = student_profile.get("interests", [])
@@ -275,17 +279,17 @@ class RemediationGenerator:
         - Missing Steps: {evaluation.get('competency_map', {}).get('missing_steps', [])}
         - Incorrect Steps: {evaluation.get('competency_map', {}).get('incorrect_steps', [])}
         """
-        
+
         # Add remediation examples from vector search
         if remediation_examples:
             prompt += "\n\nRelevant Examples and Explanations:\n"
             for i, example in enumerate(remediation_examples[:2]):
-                content = example.get('content', '')
+                content = example.get("content", "")
                 if isinstance(content, str):
                     prompt += f"Example {i+1}: {content[:400]}...\n"
                 else:
                     prompt += f"Example {i+1}: {str(content)[:400]}...\n"
-        
+
         prompt += f"""
         Create remediation that:
         1. Specifically addresses "{target_gap}"
@@ -296,5 +300,5 @@ class RemediationGenerator:
         6. Uses the provided examples to ensure accuracy
         
         Make it encouraging and accessible."""
-        
+
         return prompt

@@ -13,25 +13,23 @@ Use this when you need to test the exercise service without running full depende
 
 import asyncio
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import Dict, Any, List
-import json
-import os
+from typing import Dict, Any
 from datetime import datetime
+
 
 class MockServices:
     """Mock services for testing."""
-    
-    def __init__(self):
+
+    def __init__(self) -> None:
         self.content_app = self._create_content_service()
         self.simple_app = self._create_simple_service()
-    
+
     def _create_content_service(self) -> FastAPI:
         """Create mock content service."""
         app = FastAPI(title="Mock Content Service", version="1.0.0")
-        
+
         # Add CORS middleware
         app.add_middleware(
             CORSMiddleware,
@@ -40,15 +38,15 @@ class MockServices:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        
+
         @app.get("/health")
         async def health():
             return {
-                "status": "healthy", 
+                "status": "healthy",
                 "service": "mock-content-service",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
-        
+
         @app.get("/api/content/concepts/{concept_id}")
         async def get_concept(concept_id: str):
             """Get concept information."""
@@ -63,22 +61,22 @@ class MockServices:
                         "Understand the standard form of quadratic equations",
                         "Apply factoring method to solve quadratic equations",
                         "Use the quadratic formula when factoring is not possible",
-                        "Verify solutions by substitution"
+                        "Verify solutions by substitution",
                     ],
                     "examples": [
                         {
                             "equation": "x² + 5x + 6 = 0",
                             "solution": "x = -2 or x = -3",
-                            "method": "factoring"
+                            "method": "factoring",
                         },
                         {
                             "equation": "2x² - 7x + 3 = 0",
                             "solution": "x = 3 or x = 1/2",
-                            "method": "factoring"
-                        }
+                            "method": "factoring",
+                        },
                     ],
                     "difficulty": "intermediate",
-                    "prerequisites": ["linear_equations", "basic_algebra"]
+                    "prerequisites": ["linear_equations", "basic_algebra"],
                 },
                 "linear_equations": {
                     "concept_id": concept_id,
@@ -88,20 +86,20 @@ class MockServices:
                     "learning_objectives": [
                         "Understand linear equations",
                         "Solve linear equations using algebraic methods",
-                        "Apply linear equations to real-world problems"
+                        "Apply linear equations to real-world problems",
                     ],
                     "examples": [
                         {
                             "equation": "2x + 3 = 7",
                             "solution": "x = 2",
-                            "method": "algebraic"
+                            "method": "algebraic",
                         }
                     ],
                     "difficulty": "basic",
-                    "prerequisites": ["basic_algebra"]
-                }
+                    "prerequisites": ["basic_algebra"],
+                },
             }
-            
+
             if concept_id in mock_concepts:
                 return mock_concepts[concept_id]
             else:
@@ -114,25 +112,25 @@ class MockServices:
                     "learning_objectives": [
                         "Understand the concept",
                         "Apply the concept to problems",
-                        "Verify understanding"
+                        "Verify understanding",
                     ],
                     "examples": [
                         {
                             "problem": "Example problem",
                             "solution": "Example solution",
-                            "method": "example method"
+                            "method": "example method",
                         }
                     ],
                     "difficulty": "intermediate",
-                    "prerequisites": ["basic_knowledge"]
+                    "prerequisites": ["basic_knowledge"],
                 }
-        
+
         @app.post("/api/content/search")
         async def search_content(query: Dict[str, Any]):
             """Mock content search endpoint."""
             search_query = query.get("query", "")
             limit = query.get("limit", 5)
-            
+
             # Mock search results
             mock_results = [
                 {
@@ -143,7 +141,7 @@ class MockServices:
                     "content_type": "educational_material",
                     "source": "Mock Textbook",
                     "subject": "Mathematics",
-                    "chapter": "Chapter 1"
+                    "chapter": "Chapter 1",
                 },
                 {
                     "content_id": "mock_content_2",
@@ -153,17 +151,17 @@ class MockServices:
                     "content_type": "educational_material",
                     "source": "Mock Textbook",
                     "subject": "Mathematics",
-                    "chapter": "Chapter 2"
-                }
+                    "chapter": "Chapter 2",
+                },
             ]
-            
+
             return {
                 "query": search_query,
                 "results": mock_results[:limit],
                 "total_results": len(mock_results),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
-        
+
         @app.get("/api/content/vector-search")
         async def vector_search(concept: str, interests: str = "", limit: int = 3):
             """Mock vector search endpoint."""
@@ -177,8 +175,8 @@ class MockServices:
                         "book": "Advanced Mathematics",
                         "subject": "Mathematics",
                         "chapter": "Quadratic Equations",
-                        "page": 145
-                    }
+                        "page": 145,
+                    },
                 },
                 {
                     "chunk_id": "chunk_2",
@@ -188,25 +186,25 @@ class MockServices:
                         "book": "Math Fundamentals",
                         "subject": "Mathematics",
                         "chapter": "Algebraic Methods",
-                        "page": 67
-                    }
-                }
+                        "page": 67,
+                    },
+                },
             ]
-            
+
             return {
                 "concept": concept,
                 "interests": interests,
                 "results": mock_results[:limit],
                 "total_results": len(mock_results),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
-        
+
         return app
-    
+
     def _create_simple_service(self) -> FastAPI:
         """Create simple mock exercise service."""
         app = FastAPI(title="Mock Exercise Service", version="1.0.0")
-        
+
         # Add CORS middleware
         app.add_middleware(
             CORSMiddleware,
@@ -215,30 +213,30 @@ class MockServices:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-        
+
         @app.get("/")
         async def root():
             return {
                 "message": "Mock Exercise Service is running",
                 "timestamp": datetime.utcnow().isoformat(),
-                "service": "mock-exercise-service"
+                "service": "mock-exercise-service",
             }
-        
+
         @app.get("/health")
         async def health():
             return {
                 "status": "healthy",
                 "service": "mock-exercise-service",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.utcnow().isoformat(),
             }
-        
+
         @app.post("/api/exercise/generate")
         async def generate_exercise(request: Dict[str, Any]):
             """Mock exercise generation endpoint."""
             concept_id = request.get("concept_id", "unknown")
             student_id = request.get("student_id", "unknown")
             interests = request.get("student_interests", [])
-            
+
             # Mock exercise response
             mock_exercise = {
                 "exercise_id": f"mock_exercise_{concept_id}_{student_id}",
@@ -252,30 +250,33 @@ class MockServices:
                         "Step 1: Identify the problem type",
                         "Step 2: Apply the appropriate method",
                         "Step 3: Solve systematically",
-                        "Step 4: Verify the solution"
-                    ]
+                        "Step 4: Verify the solution",
+                    ],
                 },
                 "difficulty": request.get("difficulty", "basic"),
                 "life_category": request.get("life_category", "academic"),
                 "personalization": {
                     "interests_used": interests[:2],
-                    "context": "Mock personalized context"
+                    "context": "Mock personalized context",
                 },
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.utcnow().isoformat(),
             }
-            
+
             return mock_exercise
-        
+
         @app.post("/api/exercise/evaluate")
         async def evaluate_response(request: Dict[str, Any]):
             """Mock response evaluation endpoint."""
             exercise_id = request.get("exercise_id", "unknown")
             student_response = request.get("student_response", "")
-            
+
             # Mock evaluation based on response length and content
             response_length = len(student_response)
-            has_keywords = any(keyword in student_response.lower() for keyword in ["formula", "solve", "equation", "steps"])
-            
+            has_keywords = any(
+                keyword in student_response.lower()
+                for keyword in ["formula", "solve", "equation", "steps"]
+            )
+
             if response_length < 50:
                 understanding_score = 0.3
                 mastery_achieved = False
@@ -285,7 +286,7 @@ class MockServices:
             else:
                 understanding_score = 0.8 if has_keywords else 0.5
                 mastery_achieved = understanding_score >= 0.8
-            
+
             mock_evaluation = {
                 "evaluation_id": f"mock_eval_{exercise_id}",
                 "exercise_id": exercise_id,
@@ -295,87 +296,74 @@ class MockServices:
                 "feedback": "Mock feedback based on response analysis",
                 "competency_map": {
                     "correct_steps": ["Step 1", "Step 2"] if has_keywords else [],
-                    "missing_steps": ["Step 3", "Step 4"] if not mastery_achieved else [],
-                    "incorrect_steps": []
+                    "missing_steps": (
+                        ["Step 3", "Step 4"] if not mastery_achieved else []
+                    ),
+                    "incorrect_steps": [],
                 },
-                "evaluated_at": datetime.utcnow().isoformat()
+                "evaluated_at": datetime.utcnow().isoformat(),
             }
-            
+
             return mock_evaluation
-        
+
         return app
 
 
-async def run_content_service():
+async def run_content_service() -> None:
     """Run mock content service."""
     print("🚀 Starting Mock Content Service on port 8001...")
     mock_services = MockServices()
-    
+
     config = uvicorn.Config(
-        app=mock_services.content_app,
-        host="0.0.0.0",
-        port=8001,
-        log_level="info"
+        app=mock_services.content_app, host="0.0.0.0", port=8001, log_level="info"
     )
     server = uvicorn.Server(config)
     await server.serve()
 
 
-async def run_simple_service():
+async def run_simple_service() -> None:
     """Run mock simple exercise service."""
     print("🚀 Starting Mock Exercise Service on port 8003...")
     mock_services = MockServices()
-    
+
     config = uvicorn.Config(
-        app=mock_services.simple_app,
-        host="0.0.0.0",
-        port=8003,
-        log_level="info"
+        app=mock_services.simple_app, host="0.0.0.0", port=8003, log_level="info"
     )
     server = uvicorn.Server(config)
     await server.serve()
 
 
-async def run_both_services():
+async def run_both_services() -> None:
     """Run both mock services concurrently."""
     print("🚀 Starting Both Mock Services...")
     print("   📡 Mock Content Service on port 8001")
     print("   🎯 Mock Exercise Service on port 8003")
-    
+
     mock_services = MockServices()
-    
+
     # Create server configs
     content_config = uvicorn.Config(
-        app=mock_services.content_app,
-        host="0.0.0.0",
-        port=8001,
-        log_level="info"
+        app=mock_services.content_app, host="0.0.0.0", port=8001, log_level="info"
     )
-    
+
     simple_config = uvicorn.Config(
-        app=mock_services.simple_app,
-        host="0.0.0.0",
-        port=8003,
-        log_level="info"
+        app=mock_services.simple_app, host="0.0.0.0", port=8003, log_level="info"
     )
-    
+
     # Run both servers concurrently
     content_server = uvicorn.Server(content_config)
     simple_server = uvicorn.Server(simple_config)
-    
-    await asyncio.gather(
-        content_server.serve(),
-        simple_server.serve()
-    )
+
+    await asyncio.gather(content_server.serve(), simple_server.serve())
 
 
-def main():
+def main() -> None:
     """Main entry point."""
     import sys
-    
+
     if len(sys.argv) > 1:
         service_type = sys.argv[1].lower()
-        
+
         if service_type == "content":
             asyncio.run(run_content_service())
         elif service_type == "simple":
@@ -394,4 +382,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

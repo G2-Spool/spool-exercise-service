@@ -1,16 +1,17 @@
 """Example usage of the personality system."""
 
-from personality_loader import personality_loader
+from .personality_loader import personality_loader
 
-def demonstrate_personality_system():
+
+def demonstrate_personality_system() -> None:
     """Demonstrate how the personality system works."""
-    
+
     print("=== Personality System Demo ===\n")
-    
+
     # List all available personalities
     personalities = personality_loader.list_available_personalities()
     print(f"Available personalities: {personalities}\n")
-    
+
     # Example base system prompt (simplified)
     base_prompt = """
     ## CORE IDENTITY
@@ -19,13 +20,21 @@ def demonstrate_personality_system():
     ## REQUIREMENTS
     You MUST create exercises that connect to student interests.
     """
-    
+
     # Demonstrate different personalities
-    for personality in ["default", "enthusiastic-coach", "wise-mentor", "analytical-detective"]:
+    for personality in [
+        "default",
+        "enthusiastic-coach",
+        "wise-mentor",
+        "analytical-detective",
+    ]:
         print(f"--- {personality.upper()} PERSONALITY ---")
-        enhanced_prompt = personality_loader.apply_personality_to_prompt(base_prompt, personality)
+        enhanced_prompt = personality_loader.apply_personality_to_prompt(
+            base_prompt, personality
+        )
         # Show just the first 200 characters to keep output manageable
         print(enhanced_prompt[:200] + "...\n")
+
 
 if __name__ == "__main__":
     demonstrate_personality_system()
@@ -62,4 +71,4 @@ remediation = await remediation_generator.generate(
     evaluation=evaluation,
     personality="empathetic-supporter"  # <-- Add personality parameter
 )
-""" 
+"""

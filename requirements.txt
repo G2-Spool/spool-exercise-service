@@ -22,7 +22,7 @@ redis==5.2.1
 aiocache==0.12.3
 
 # Data Processing
-numpy==2.2.0
+numpy==1.26.4
 pandas==2.2.3
 
 # Async Support
@@ -53,8 +53,8 @@ pre-commit==4.0.1
 boto3==1.39.4
 
 # Vector Database
-pinecone-client==3.2.2
-langchain-pinecone==0.1.3
+pinecone-client==5.0.1
+langchain-pinecone==0.2.0
 
 # Type stubs for mypy
 boto3-stubs[essential]

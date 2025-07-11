@@ -1,1 +1,1 @@
-"""Services module for exercise service.""" 
+"""Services module for exercise service."""

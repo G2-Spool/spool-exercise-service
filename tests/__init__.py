@@ -1,1 +1,1 @@
-"""Tests package for the exercise service.""" 
+"""Tests package for the exercise service."""
