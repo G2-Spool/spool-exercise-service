@@ -1,7 +1,7 @@
 """Tool manager for coordinating educational tools."""
 
 from typing import Dict, Any, List, Optional
-from .calculator_tool import CalculatorTool
+from .calculator_tool import SecureCalculatorTool
 from .code_executor import SecureCodeExecutor
 from .search_tool import SearchTool
 import structlog
@@ -13,7 +13,7 @@ class ToolManager:
     """Manages and coordinates all available educational tools."""
     
     def __init__(self):
-        self.calculator = CalculatorTool()
+        self.calculator = SecureCalculatorTool()
         self.code_executor = SecureCodeExecutor()
         self.search_tool = SearchTool()
         self.tools_enabled = True

@@ -22,11 +22,15 @@ Successfully implemented **Chain-of-Thought Prompting Strategies** and **Tool Us
 
 ### 2. **Tool Use Recommendations**
 
-#### **Calculator Tool** (`app/tools/calculator_tool.py`)
-- ✅ **Mathematical Computation**: Safe expression evaluation
-- ✅ **Quadratic Equation Solver**: Specialized solver with discriminant analysis
-- ✅ **Solution Verification**: Validates mathematical solutions
-- ✅ **Safety Features**: AST-based parsing prevents code injection
+#### **Secure Calculator Tool** (`app/tools/calculator_tool.py`)
+- ✅ **Mathematical Computation**: Safe expression evaluation with resource limits
+- ✅ **Memory Usage Caps**: Configurable memory limits (10MB default)
+- ✅ **Timeout Enforcement**: Real timeout protection (5 seconds default)
+- ✅ **Input Validation**: Size limits and dangerous pattern detection
+- ✅ **Large Number Protection**: Prevents extremely large number calculations
+- ✅ **Quadratic Equation Solver**: Specialized solver with security checks
+- ✅ **Solution Verification**: Validates mathematical solutions safely
+- ✅ **Resource Exhaustion Prevention**: Blocks memory and CPU intensive operations
 
 #### **Secure Code Executor Tool** (`app/tools/code_executor.py`)
 - ✅ **Process Isolation**: Complete subprocess execution with full security
@@ -201,14 +205,24 @@ spool-exercise-service/
 - ❌ **FIXED**: I/O hijacking through subprocess isolation
 - ❌ **FIXED**: AST check bypassing with comprehensive pattern blocking
 
+### **Calculator Tool Security Enhancement**
+- ❌ **FIXED**: Large number resource exhaustion attacks
+- ❌ **FIXED**: Memory exhaustion through massive calculations
+- ❌ **FIXED**: Timeout bypassing with long computations
+- ❌ **FIXED**: Input size attacks with oversized expressions
+- ❌ **FIXED**: Calculation overflow vulnerabilities
+
 ### **Security Test Results**
 ```bash
-🛡️ All 6 critical vulnerabilities successfully resolved
-✅ Process isolation with subprocess execution
-✅ Real timeout enforcement (kills runaway processes)
-✅ Resource limits prevent memory/CPU exhaustion
-✅ Multi-layer security validation (string + AST + runtime)
-✅ Comprehensive exploit protection (eval, exec, sandbox escapes)
+🛡️ All critical vulnerabilities successfully resolved
+✅ Code Executor: Process isolation with subprocess execution
+✅ Code Executor: Real timeout enforcement (kills runaway processes)
+✅ Code Executor: Resource limits prevent memory/CPU exhaustion
+✅ Code Executor: Multi-layer security validation
+✅ Code Executor: Comprehensive exploit protection
+✅ Calculator Tool: Memory usage caps and timeout enforcement
+✅ Calculator Tool: Large number and input validation
+✅ Calculator Tool: Resource exhaustion prevention
 ✅ Production-ready with enterprise-grade security
 ```
 
