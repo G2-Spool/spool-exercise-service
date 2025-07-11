@@ -355,6 +355,7 @@ class ResponseEvaluator:
         3. Focus on ability/intelligence rather than effort and strategy
         4. Give feedback that doesn't include concrete improvement steps
         5. Evaluate based on exact wording rather than conceptual understanding
+        6. Require the student to solve the problem multiple times to get full credit
 
         ## STRUCTURED OUTPUT FORMAT
         Return JSON with:
@@ -365,6 +366,7 @@ class ResponseEvaluator:
         - next_steps: Clear guidance for continued learning
         
         CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score.
+        CRITICAL: If the student understands the problem and solves it correctly, give them a score of 10/10.
 
         ## THINKING PROCESS
         Before evaluating:
