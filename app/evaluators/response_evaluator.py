@@ -1,7 +1,7 @@
 """Evaluate student responses to identify understanding gaps."""
 
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
 from openai import AsyncOpenAI
@@ -23,11 +23,26 @@ class ResponseEvaluator:
         self.pinecone_service = PineconeExerciseService()
         self.chain_of_thought = ChainOfThoughtPrompts()
 
+    def _should_use_mock(self) -> bool:
+        """Centralized check for mock evaluation usage."""
+        key = settings.OPENAI_API_KEY
+        return not key or key == "test_key" or key.startswith("test") or key == "your-openai-api-key"
+
     async def evaluate(
         self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any],
         use_enhanced_prompts: bool = True
     ) -> Dict[str, Any]:
         """Evaluate a student's response with enhanced context and chain-of-thought prompting."""
+        # Validate response length
+        if len(student_response) < settings.MIN_RESPONSE_LENGTH:
+            return self._create_insufficient_response_evaluation(
+                exercise, student_response
+            )
+
+        # Early return for mock evaluations
+        if self._should_use_mock():
+            return self._create_mock_evaluation(exercise, student_response, concept)
+
         try:
             # Get concept context for better evaluation
             context_chunks = await self.pinecone_service.get_concept_context(
@@ -36,37 +51,17 @@ class ResponseEvaluator:
                 "basic",
             )
 
-            # Validate response length
-            if len(student_response) < settings.MIN_RESPONSE_LENGTH:
-                return self._create_insufficient_response_evaluation(
-                    exercise, student_response
-                )
+            # Build unified prompt
+            prompt = self._build_prompt(
+                exercise,
+                student_response,
+                concept,
+                context_chunks,
+                use_enhanced_prompts,
+            )
 
-            # Check if using test key or no key - create mock evaluation
-            if (
-                not settings.OPENAI_API_KEY
-                or settings.OPENAI_API_KEY == "test_key"
-                or settings.OPENAI_API_KEY.startswith("test")
-                or settings.OPENAI_API_KEY == "your-openai-api-key"
-            ):
-                return self._create_mock_evaluation(exercise, student_response, concept)
-
-            # Create enhanced prompt with chain-of-thought strategies
-            if use_enhanced_prompts and context_chunks:
-                prompt = self.chain_of_thought.create_enhanced_evaluation_prompt(
-                    exercise, student_response, concept, context_chunks
-                )
-            elif context_chunks:
-                prompt = self._create_enhanced_evaluation_prompt(
-                    exercise, student_response, concept, context_chunks
-                )
-            else:
-                prompt = self._create_evaluation_prompt(
-                    exercise, student_response, concept
-                )
-
-            # Enhanced system prompt with chain-of-thought instructions
-            system_prompt = self._get_enhanced_system_prompt(use_enhanced_prompts)
+            # Get system prompt
+            system_prompt = self._get_system_prompt(use_enhanced_prompts)
 
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -202,6 +197,145 @@ class ResponseEvaluator:
             logger.error("Response evaluation failed", error=str(e))
             # Fallback to mock evaluation on any error
             return self._create_mock_evaluation(exercise, student_response, concept)
+
+    def _get_system_prompt(self, enhanced: bool = True) -> str:
+        """Unified system prompt generator."""
+        base_prompt = """
+        ## CORE IDENTITY
+        You are an expert educational evaluator specializing in formative assessment that treats evaluation as a learning opportunity and provides growth-focused feedback.
+
+        ## MANDATORY REQUIREMENTS
+        You MUST evaluate responses by:
+        1. Assessing both conceptual understanding and problem-solving process
+        2. Identifying specific strengths and concrete areas for improvement
+        3. Providing actionable feedback focused on effort, strategy, and process
+        4. Mapping student understanding against expected cognitive steps
+        5. Determining next learning steps, not just current performance level
+
+        ## FORBIDDEN PRACTICES
+        You MUST NEVER:
+        1. Accept correct answers without demonstrated understanding of process
+        2. Provide generic praise or criticism without specific examples
+        3. Focus on ability/intelligence rather than effort and strategy
+        4. Give feedback that doesn't include concrete improvement steps
+        5. Evaluate based on exact wording rather than conceptual understanding
+        6. Require the student to solve the problem multiple times to get full credit
+
+        ## STRUCTURED OUTPUT FORMAT
+        Return JSON with:
+        - understanding_analysis: Detailed breakdown of demonstrated vs. missing understanding (include overall understanding score 0-10)
+        - process_evaluation: Assessment of problem-solving approach and reasoning quality
+        - growth_feedback: Specific, actionable suggestions for improvement
+        - strength_identification: Concrete evidence of what student did well
+        - next_steps: Clear guidance for continued learning
+        
+        CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score.
+        CRITICAL: If the student understands the problem and solves it correctly, give them a score of 10/10.
+
+        ## THINKING PROCESS
+        Before evaluating:
+        1. Identify evidence of deep vs. surface understanding
+        2. Analyze problem-solving process and reasoning quality
+        3. Connect evaluation to learning objectives and expected outcomes
+        4. Generate specific, actionable feedback for improvement
+        5. Consider multiple valid approaches while maintaining rigor"""
+
+        enhanced_block = """
+        
+        ## ENHANCED CHAIN-OF-THOUGHT EVALUATION PROCESS
+        When evaluating responses, follow this enhanced process:
+        
+        ### Step 1: Systematic Analysis
+        - First, read the entire response to understand the student's approach
+        - Identify the main strategy or method the student used
+        - Note any mathematical or logical reasoning demonstrated
+        
+        ### Step 2: Step-by-Step Verification
+        - Break down the response into individual steps or components
+        - Verify each step against the expected solution path
+        - Check mathematical accuracy and logical flow
+        
+        ### Step 3: Understanding Assessment
+        - Evaluate conceptual understanding vs. procedural execution
+        - Identify gaps between what the student knows and what they demonstrated
+        - Assess whether errors are conceptual or computational
+        
+        ### Step 4: Comprehensive Scoring
+        - Assign understanding score based on demonstrated mastery
+        - Consider multiple valid approaches and partial credit
+        - Ensure scoring reflects depth of understanding, not just correctness
+        
+        ### Step 5: Feedback Generation
+        - Provide specific, actionable feedback for improvement
+        - Highlight strengths and build confidence
+        - Suggest next steps for continued learning
+        
+        **Critical**: Always show your reasoning process and explicitly state "Understanding score: X/10" in your analysis.""" if enhanced else ""
+
+        return base_prompt + enhanced_block
+
+    def _build_prompt(
+        self,
+        exercise: Dict[str, Any],
+        student_response: str,
+        concept: Dict[str, Any],
+        context_chunks: Optional[List[Dict[str, Any]]] = None,
+        enhanced: bool = False,
+    ) -> str:
+        """Single prompt builder with optional enhanced/context features."""
+        expected_steps = exercise.get("expected_steps", [])
+
+        # Base prompt construction
+        prompt = f"""Evaluate this student's response to an exercise:
+        
+        Concept Being Tested: {concept.get('name')}
+        
+        Exercise Scenario: {exercise.get('content', {}).get('scenario')}
+        Exercise Problem: {exercise.get('content', {}).get('problem')}
+        
+        Expected Solution Steps:
+        {chr(10).join(f"{i+1}. {step}" for i, step in enumerate(expected_steps))}
+        
+        Student's Response:
+        "{student_response}"
+        """
+
+        # Add context for more accurate evaluation if available
+        if context_chunks:
+            prompt += "\n\nAdditional Context for Evaluation:\n"
+            for i, chunk in enumerate(context_chunks[:2]):
+                content = chunk.get("content", "")
+                if isinstance(content, str):
+                    prompt += f"Context {i+1}: {content[:300]}...\n"
+                else:
+                    prompt += f"Context {i+1}: {str(content)[:300]}...\n"
+
+        # Add enhanced evaluation criteria if requested
+        enhanced_criteria = ""
+        if enhanced:
+            enhanced_criteria = """
+        
+        ENHANCED EVALUATION CRITERIA:
+        - Use systematic step-by-step analysis
+        - Verify each component against expected solution path
+        - Assess both conceptual understanding and procedural execution
+        - Provide comprehensive scoring with detailed reasoning"""
+
+        prompt += f"""
+        
+        Evaluation Criteria:
+        1. Has the student demonstrated understanding of each expected step?
+        2. Is their reasoning logically sound?
+        3. Did they identify the key concepts?
+        4. Are there any misconceptions or knowledge gaps?
+        5. Is the explanation complete and clear?
+        {"6. Use the provided context to verify accuracy" if context_chunks else ""}
+        {enhanced_criteria}
+        
+        Score their overall understanding from 0.0 to 1.0.
+        Mastery is achieved ONLY if they explain ALL key steps correctly."""
+
+        return prompt
 
     def _create_mock_evaluation(
         self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any]
@@ -397,169 +531,6 @@ class ResponseEvaluator:
                 missing_steps.append(f"Missing: {step}")
 
         return correct_steps, missing_steps, incorrect_steps
-
-    def _get_system_prompt(self) -> str:
-        """Get system prompt for response evaluation."""
-        return """
-        ## CORE IDENTITY
-        You are an expert educational evaluator specializing in formative assessment that treats evaluation as a learning opportunity and provides growth-focused feedback.
-
-        ## MANDATORY REQUIREMENTS
-        You MUST evaluate responses by:
-        1. Assessing both conceptual understanding and problem-solving process
-        2. Identifying specific strengths and concrete areas for improvement
-        3. Providing actionable feedback focused on effort, strategy, and process
-        4. Mapping student understanding against expected cognitive steps
-        5. Determining next learning steps, not just current performance level
-
-        ## FORBIDDEN PRACTICES
-        You MUST NEVER:
-        1. Accept correct answers without demonstrated understanding of process
-        2. Provide generic praise or criticism without specific examples
-        3. Focus on ability/intelligence rather than effort and strategy
-        4. Give feedback that doesn't include concrete improvement steps
-        5. Evaluate based on exact wording rather than conceptual understanding
-        6. Require the student to solve the problem multiple times to get full credit
-
-        ## STRUCTURED OUTPUT FORMAT
-        Return JSON with:
-        - understanding_analysis: Detailed breakdown of demonstrated vs. missing understanding (include overall understanding score 0-10)
-        - process_evaluation: Assessment of problem-solving approach and reasoning quality
-        - growth_feedback: Specific, actionable suggestions for improvement
-        - strength_identification: Concrete evidence of what student did well
-        - next_steps: Clear guidance for continued learning
-        
-        CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score.
-        CRITICAL: If the student understands the problem and solves it correctly, give them a score of 10/10.
-
-        ## THINKING PROCESS
-        Before evaluating:
-        1. Identify evidence of deep vs. surface understanding
-        2. Analyze problem-solving process and reasoning quality
-        3. Connect evaluation to learning objectives and expected outcomes
-        4. Generate specific, actionable feedback for improvement
-        5. Consider multiple valid approaches while maintaining rigor
-        """
-    
-    def _get_enhanced_system_prompt(self, use_enhanced_prompts: bool = True) -> str:
-        """Get enhanced system prompt for response evaluation."""
-        base_prompt = self._get_system_prompt()
-        
-        if use_enhanced_prompts:
-            enhanced_prompt = base_prompt + """
-            
-        ## ENHANCED CHAIN-OF-THOUGHT EVALUATION PROCESS
-        When evaluating responses, follow this enhanced process:
-        
-        ### Step 1: Systematic Analysis
-        - First, read the entire response to understand the student's approach
-        - Identify the main strategy or method the student used
-        - Note any mathematical or logical reasoning demonstrated
-        
-        ### Step 2: Step-by-Step Verification
-        - Break down the response into individual steps or components
-        - Verify each step against the expected solution path
-        - Check mathematical accuracy and logical flow
-        
-        ### Step 3: Understanding Assessment
-        - Evaluate conceptual understanding vs. procedural execution
-        - Identify gaps between what the student knows and what they demonstrated
-        - Assess whether errors are conceptual or computational
-        
-        ### Step 4: Comprehensive Scoring
-        - Assign understanding score based on demonstrated mastery
-        - Consider multiple valid approaches and partial credit
-        - Ensure scoring reflects depth of understanding, not just correctness
-        
-        ### Step 5: Feedback Generation
-        - Provide specific, actionable feedback for improvement
-        - Highlight strengths and build confidence
-        - Suggest next steps for continued learning
-        
-        **Critical**: Always show your reasoning process and explicitly state "Understanding score: X/10" in your analysis.
-        """
-            return enhanced_prompt
-        else:
-            return base_prompt
-
-    def _create_evaluation_prompt(
-        self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any]
-    ) -> str:
-        """Create prompt for response evaluation."""
-        expected_steps = exercise.get("expected_steps", [])
-
-        prompt = f"""Evaluate this student's response to an exercise:
-        
-        Concept Being Tested: {concept.get('name')}
-        
-        Exercise Scenario: {exercise.get('content', {}).get('scenario')}
-        Exercise Problem: {exercise.get('content', {}).get('problem')}
-        
-        Expected Solution Steps:
-        {chr(10).join(f"{i+1}. {step}" for i, step in enumerate(expected_steps))}
-        
-        Student's Response:
-        "{student_response}"
-        
-        Evaluation Criteria:
-        1. Has the student demonstrated understanding of each expected step?
-        2. Is their reasoning logically sound?
-        3. Did they identify the key concepts?
-        4. Are there any misconceptions or assemblage gaps?
-        5. Is the explanation complete and clear?
-        
-        Score their overall understanding from 0.0 to 1.0.
-        Mastery is achieved ONLY if they explain ALL key steps correctly."""
-
-        return prompt
-
-    def _create_enhanced_evaluation_prompt(
-        self,
-        exercise: Dict[str, Any],
-        student_response: str,
-        concept: Dict[str, Any],
-        context_chunks: List[Dict[str, Any]],
-    ) -> str:
-        """Create enhanced evaluation prompt with context."""
-        expected_steps = exercise.get("expected_steps", [])
-
-        prompt = f"""Evaluate this student's response to an exercise:
-        
-        Concept Being Tested: {concept.get('name')}
-        
-        Exercise Scenario: {exercise.get('content', {}).get('scenario')}
-        Exercise Problem: {exercise.get('content', {}).get('problem')}
-        
-        Expected Solution Steps:
-        {chr(10).join(f"{i+1}. {step}" for i, step in enumerate(expected_steps))}
-        
-        Student's Response:
-        "{student_response}"
-        """
-
-        # Add context for more accurate evaluation
-        if context_chunks:
-            prompt += "\n\nAdditional Context for Evaluation:\n"
-            for i, chunk in enumerate(context_chunks[:2]):
-                content = chunk.get("content", "")
-                if isinstance(content, str):
-                    prompt += f"Context {i+1}: {content[:300]}...\n"
-                else:
-                    prompt += f"Context {i+1}: {str(content)[:300]}...\n"
-
-        prompt += """
-        Evaluation Criteria:
-        1. Has the student demonstrated understanding of each expected step?
-        2. Is their reasoning logically sound?
-        3. Did they identify the key concepts?
-        4. Are there any misconceptions or knowledge gaps?
-        5. Is the explanation complete and clear?
-        6. Use the provided context to verify accuracy
-        
-        Score their overall understanding from 0.0 to 1.0.
-        Mastery is achieved ONLY if they explain ALL key steps correctly."""
-
-        return prompt
 
     def _create_insufficient_response_evaluation(
         self, exercise: Dict[str, Any], student_response: str

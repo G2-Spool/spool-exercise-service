@@ -24,6 +24,11 @@ class ExerciseGenerator:
         self.pinecone_service = PineconeExerciseService()
         self.chain_of_thought = ChainOfThoughtPrompts()
 
+    def _should_use_mock(self) -> bool:
+        """Centralized check for mock exercise usage."""
+        key = settings.OPENAI_API_KEY
+        return not key or key == "test_key" or key.startswith("test") or key == "your-openai-api-key"
+
     async def generate(
         self,
         concept: Dict[str, Any],
@@ -35,6 +40,12 @@ class ExerciseGenerator:
         use_enhanced_prompts: bool = True,
     ) -> Dict[str, Any]:
         """Generate a personalized exercise with enhanced chain-of-thought prompting."""
+        # Early return for mock exercises
+        if self._should_use_mock():
+            return self._create_mock_exercise(
+                concept, student_profile, life_category, difficulty, exercise_type
+            )
+
         try:
             # Get relevant context from Pinecone
             context_chunks = await self.pinecone_service.get_concept_context(
@@ -48,45 +59,20 @@ class ExerciseGenerator:
                 concept.get("concept_id", ""), student_profile
             )
 
-            # Check if using test key or no key - create mock exercise
-            if (
-                not settings.OPENAI_API_KEY
-                or settings.OPENAI_API_KEY == "test_key"
-                or settings.OPENAI_API_KEY.startswith("test")
-                or settings.OPENAI_API_KEY == "your-openai-api-key"
-            ):
-                return self._create_mock_exercise(
-                    concept, student_profile, life_category, difficulty, exercise_type
-                )
+            # Build unified prompt
+            prompt = self._build_prompt(
+                concept,
+                student_profile,
+                life_category,
+                difficulty,
+                exercise_type,
+                context_chunks,
+                similar_exercises,
+                use_enhanced_prompts,
+            )
 
-            # Create enhanced prompt with chain-of-thought strategies
-            if use_enhanced_prompts and (context_chunks or similar_exercises):
-                prompt = self.chain_of_thought.create_enhanced_exercise_prompt(
-                    concept,
-                    student_profile,
-                    context_chunks,
-                    life_category=life_category,
-                    difficulty=difficulty,
-                    exercise_type=exercise_type,
-                    similar_exercises=similar_exercises,
-                )
-            elif context_chunks or similar_exercises:
-                prompt = self._create_enhanced_generation_prompt(
-                    concept,
-                    student_profile,
-                    life_category,
-                    difficulty,
-                    exercise_type,
-                    context_chunks,
-                    similar_exercises,
-                )
-            else:
-                prompt = self._create_generation_prompt(
-                    concept, student_profile, life_category, difficulty, exercise_type
-                )
-
-            # Enhanced system prompt with chain-of-thought instructions
-            system_prompt = self._get_enhanced_system_prompt(personality, use_enhanced_prompts)
+            # Get system prompt with personality
+            system_prompt = self._get_system_prompt(personality, use_enhanced_prompts)
 
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -140,6 +126,149 @@ class ExerciseGenerator:
             return self._create_mock_exercise(
                 concept, student_profile, life_category, difficulty, exercise_type
             )
+
+    def _get_system_prompt(self, personality: Optional[str] = None, enhanced: bool = True) -> str:
+        """Unified system prompt generator."""
+        base_prompt = """
+        ## CORE IDENTITY
+        You are an expert educational content creator specializing in authentic, performance-based assessment that connects academic concepts to students' real interests and contexts.
+
+        ## MANDATORY REQUIREMENTS
+        You MUST create exercises that:
+        1. Present specific, concrete problems requiring numerical/measurable solutions
+        2. Connect authentically to student interests through real-world scenarios
+        3. Require step-by-step demonstration of understanding
+        4. Include clear success criteria and expected solution paths
+        5. Provide scaffolded complexity appropriate to difficulty level
+
+        ## FORBIDDEN PRACTICES
+        You MUST NEVER:
+        1. Create abstract overviews or theoretical discussions instead of concrete problems
+        2. Use generic scenarios that don't meaningfully connect to student interests
+        3. Accept surface-level responses without deep demonstration of understanding
+        4. Create problems that require memorization rather than application
+        5. Generate exercises without clear, measurable outcomes
+
+        ## STRUCTURED OUTPUT FORMAT
+        Return JSON with:
+        - scenario: Authentic real-world context using student interests
+        - problem: Specific, concrete challenge with measurable outcome
+        - expected_steps: 4-6 logical solution steps
+        - success_criteria: Clear performance indicators
+        - cognitive_scaffolds: Chunking strategies and complexity management
+        - metacognitive_prompts: Questions encouraging self-reflection
+
+        ## THINKING PROCESS
+        Before generating content:
+        1. Identify authentic connections between concept and student interests
+        2. Design specific problem requiring active application
+        3. Map cognitive load and chunk information appropriately
+        4. Ensure multiple valid solution pathways exist
+        5. Create opportunities for student agency and choice within structure"""
+
+        enhanced_block = """
+        
+        ## ENHANCED CHAIN-OF-THOUGHT PROMPTING
+        When creating exercises, follow this enhanced process:
+        
+        ### Step 1: Analyze and Plan
+        - Break down the concept into teachable components
+        - Identify student interests that authentically connect
+        - Plan the problem structure and expected learning path
+        
+        ### Step 2: Design with Scaffolding
+        - Create clear intermediate questions that build understanding
+        - Design self-check opportunities throughout the problem
+        - Provide worked example format students should follow
+        
+        ### Step 3: Include Reflection Components
+        - Add metacognitive prompts for self-assessment
+        - Include verification steps students should perform
+        - Create opportunities for alternative approach consideration
+        
+        ### Step 4: Verify and Refine
+        - Ensure the problem requires deep reasoning, not just recall
+        - Check that all steps logically build toward mastery
+        - Confirm authentic connection to student interests""" if enhanced else ""
+
+        prompt = base_prompt + enhanced_block
+        return personality_loader.apply_personality_to_prompt(prompt, personality)
+
+    def _build_prompt(
+        self,
+        concept: Dict[str, Any],
+        student_profile: Dict[str, Any],
+        life_category: str,
+        difficulty: str,
+        exercise_type: str,
+        context_chunks: Optional[List[Dict[str, Any]]] = None,
+        similar_exercises: Optional[List[Dict[str, Any]]] = None,
+        enhanced: bool = False,
+    ) -> str:
+        """Single prompt builder with optional enhanced/context features."""
+        interests = student_profile.get("interests", [])
+
+        # Base prompt construction
+        prompt = f"""Create a {difficulty} {exercise_type} exercise for this concept:
+        
+        Concept: {concept.get('name')}
+        Content: {concept.get('content', '')}
+        Type: {concept.get('type', 'explanation')}
+        
+        Student Profile:
+        - Interests: {', '.join(interests)}
+        - Grade Level: {student_profile.get('grade_level', 'high school')}
+        - Life Category Focus: {life_category}
+        """
+
+        # Add context from vector search if available
+        if context_chunks:
+            prompt += "\n\nRelevant Context from Knowledge Base:\n"
+            for i, chunk in enumerate(context_chunks[:2]):  # Use top 2 chunks
+                content = chunk.get("content", "")
+                if isinstance(content, str):
+                    prompt += f"Context {i+1}: {content[:300]}...\n"
+                else:
+                    prompt += f"Context {i+1}: {str(content)[:300]}...\n"
+
+        # Add similar exercise patterns if available
+        if similar_exercises:
+            prompt += "\n\nSimilar Exercise Patterns:\n"
+            for i, exercise in enumerate(similar_exercises[:1]):  # Use 1 example
+                content = exercise.get("content", "")
+                if isinstance(content, str):
+                    prompt += f"Example {i+1}: {content[:200]}...\n"
+                else:
+                    prompt += f"Example {i+1}: {str(content)[:200]}...\n"
+
+        # Add enhanced instructions if requested
+        enhanced_instructions = ""
+        if enhanced:
+            enhanced_instructions = """
+        
+        ENHANCED REQUIREMENTS:
+        - Use chain-of-thought reasoning in your design process
+        - Include self-check opportunities throughout the problem
+        - Provide worked example format students should follow
+        - Add metacognitive prompts for self-assessment"""
+
+        prompt += f"""
+        
+        Requirements:
+        1. Create a scenario that uses one or more student interests
+        2. Frame it in the context of their {life_category} goals
+        3. The problem should require explaining their complete thought process
+        4. Difficulty should be {difficulty}
+        5. Include 4-6 expected solution steps
+        6. Provide 2-3 progressive hints
+        {"7. Use the provided context to ensure accuracy and depth" if context_chunks else ""}
+        
+        {"For an ADVANCED exercise, add additional complexity like multiple concepts, edge cases, or optimization requirements." if exercise_type == "advanced" else ""}
+        {enhanced_instructions}
+        
+        The exercise should test deep understanding, not just memorization."""
+
+        return prompt
 
     def _create_mock_exercise(
         self,
@@ -196,171 +325,3 @@ class ExerciseGenerator:
         )
 
         return exercise
-
-    def _get_enhanced_system_prompt(self, personality: Optional[str] = None, use_enhanced_prompts: bool = True) -> str:
-        """Get enhanced system prompt for exercise generation with optional personality."""
-        base_prompt = """
-        ## CORE IDENTITY
-        You are an expert educational content creator specializing in authentic, performance-based assessment that connects academic concepts to students' real interests and contexts.
-
-        ## MANDATORY REQUIREMENTS
-        You MUST create exercises that:
-        1. Present specific, concrete problems requiring numerical/measurable solutions
-        2. Connect authentically to student interests through real-world scenarios
-        3. Require step-by-step demonstration of understanding
-        4. Include clear success criteria and expected solution paths
-        5. Provide scaffolded complexity appropriate to difficulty level
-
-        ## FORBIDDEN PRACTICES
-        You MUST NEVER:
-        1. Create abstract overviews or theoretical discussions instead of concrete problems
-        2. Use generic scenarios that don't meaningfully connect to student interests
-        3. Accept surface-level responses without deep demonstration of understanding
-        4. Create problems that require memorization rather than application
-        5. Generate exercises without clear, measurable outcomes
-
-        ## STRUCTURED OUTPUT FORMAT
-        Return JSON with:
-        - scenario: Authentic real-world context using student interests
-        - problem: Specific, concrete challenge with measurable outcome
-        - expected_steps: 4-6 logical solution steps
-        - success_criteria: Clear performance indicators
-        - cognitive_scaffolds: Chunking strategies and complexity management
-        - metacognitive_prompts: Questions encouraging self-reflection
-
-        ## THINKING PROCESS
-        Before generating content:
-        1. Identify authentic connections between concept and student interests
-        2. Design specific problem requiring active application
-        3. Map cognitive load and chunk information appropriately
-        4. Ensure multiple valid solution pathways exist
-        5. Create opportunities for student agency and choice within structure
-        """
-
-        if use_enhanced_prompts:
-            enhanced_base = base_prompt + """
-            
-        ## ENHANCED CHAIN-OF-THOUGHT PROMPTING
-        When creating exercises, follow this enhanced process:
-        
-        ### Step 1: Analyze and Plan
-        - Break down the concept into teachable components
-        - Identify student interests that authentically connect
-        - Plan the problem structure and expected learning path
-        
-        ### Step 2: Design with Scaffolding
-        - Create clear intermediate questions that build understanding
-        - Design self-check opportunities throughout the problem
-        - Provide worked example format students should follow
-        
-        ### Step 3: Include Reflection Components
-        - Add metacognitive prompts for self-assessment
-        - Include verification steps students should perform
-        - Create opportunities for alternative approach consideration
-        
-        ### Step 4: Verify and Refine
-        - Ensure the problem requires deep reasoning, not just recall
-        - Check that all steps logically build toward mastery
-        - Confirm authentic connection to student interests
-        """
-            return personality_loader.apply_personality_to_prompt(enhanced_base, personality)
-        else:
-            return personality_loader.apply_personality_to_prompt(base_prompt, personality)
-
-    def _create_generation_prompt(
-        self,
-        concept: Dict[str, Any],
-        student_profile: Dict[str, Any],
-        life_category: str,
-        difficulty: str,
-        exercise_type: str,
-    ) -> str:
-        """Create prompt for exercise generation."""
-        interests = student_profile.get("interests", [])
-
-        prompt = f"""Create a {difficulty} {exercise_type} exercise for this concept:
-        
-        Concept: {concept.get('name')}
-        Content: {concept.get('content', '')}
-        Type: {concept.get('type', 'explanation')}
-        
-        Student Profile:
-        - Interests: {', '.join(interests)}
-        - Grade Level: {student_profile.get('grade_level', 'high school')}
-        - Life Category Focus: {life_category}
-        
-        Requirements:
-        1. Create a scenario that uses one or more student interests
-        2. Frame it in the context of their {life_category} goals
-        3. The problem should require explaining their complete thought process
-        4. Difficulty should be {difficulty}
-        5. Include 4-6 expected solution steps
-        6. Provide 2-3 progressive hints
-        
-        {"For an ADVANCED exercise, add additional complexity like multiple concepts, edge cases, or optimization requirements." if exercise_type == "advanced" else ""}
-        
-        The exercise should test deep understanding, not just memorization."""
-
-        return prompt
-
-    def _create_enhanced_generation_prompt(
-        self,
-        concept: Dict[str, Any],
-        student_profile: Dict[str, Any],
-        life_category: str,
-        difficulty: str,
-        exercise_type: str,
-        context_chunks: List[Dict[str, Any]],
-        similar_exercises: List[Dict[str, Any]],
-    ) -> str:
-        """Create enhanced prompt with vector context."""
-        interests = student_profile.get("interests", [])
-
-        # Base prompt
-        prompt = f"""Create a {difficulty} {exercise_type} exercise for this concept:
-        
-        Concept: {concept.get('name')}
-        Content: {concept.get('content', '')}
-        Type: {concept.get('type', 'explanation')}
-        
-        Student Profile:
-        - Interests: {', '.join(interests)}
-        - Grade Level: {student_profile.get('grade_level', 'high school')}
-        - Life Category Focus: {life_category}
-        """
-
-        # Add context from vector search
-        if context_chunks:
-            prompt += "\n\nRelevant Context from Knowledge Base:\n"
-            for i, chunk in enumerate(context_chunks[:2]):  # Use top 2 chunks
-                content = chunk.get("content", "")
-                if isinstance(content, str):
-                    prompt += f"Context {i+1}: {content[:300]}...\n"
-                else:
-                    prompt += f"Context {i+1}: {str(content)[:300]}...\n"
-
-        # Add similar exercise patterns
-        if similar_exercises:
-            prompt += "\n\nSimilar Exercise Patterns:\n"
-            for i, exercise in enumerate(similar_exercises[:1]):  # Use 1 example
-                content = exercise.get("content", "")
-                if isinstance(content, str):
-                    prompt += f"Example {i+1}: {content[:200]}...\n"
-                else:
-                    prompt += f"Example {i+1}: {str(content)[:200]}...\n"
-
-        prompt += f"""
-        Requirements:
-        1. Create a scenario that uses one or more student interests
-        2. Frame it in the context of their {life_category} goals
-        3. Use the provided context to ensure accuracy and depth
-        4. The problem should require explaining their complete thought process
-        5. Difficulty should be {difficulty}
-        6. Include 4-6 expected solution steps
-        7. Provide 2-3 progressive hints
-        
-        {"For an ADVANCED exercise, add additional complexity like multiple concepts, edge cases, or optimization requirements." if exercise_type == "advanced" else ""}
-        
-        The exercise should test deep understanding, not just memorization."""
-
-        return prompt

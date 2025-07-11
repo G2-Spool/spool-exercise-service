@@ -1,7 +1,7 @@
 """Generate remediation content for learning gaps."""
 
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from datetime import datetime
 import uuid
 from openai import AsyncOpenAI
@@ -21,6 +21,11 @@ class RemediationGenerator:
         self.model = settings.GENERATION_MODEL
         self.pinecone_service = PineconeExerciseService()
 
+    def _should_use_mock(self) -> bool:
+        """Centralized check for mock remediation usage."""
+        key = settings.OPENAI_API_KEY
+        return not key or key == "test_key" or key.startswith("test") or key == "your-openai-api-key"
+
     async def generate(
         self,
         concept: Dict[str, Any],
@@ -30,6 +35,12 @@ class RemediationGenerator:
         evaluation: Dict[str, Any],
     ) -> Dict[str, Any]:
         """Generate remediation content with enhanced examples."""
+        # Early return for mock remediation
+        if self._should_use_mock():
+            return self._create_mock_remediation(
+                concept, target_gap, student_profile, original_exercise, evaluation
+            )
+
         try:
             # Get remediation examples and explanations
             remediation_examples = await self.pinecone_service.get_remediation_examples(
@@ -38,36 +49,23 @@ class RemediationGenerator:
                 student_profile.get("interests", []),
             )
 
-            # Check if using test key or no key - create mock remediation
-            if (
-                not settings.OPENAI_API_KEY
-                or settings.OPENAI_API_KEY == "test_key"
-                or settings.OPENAI_API_KEY.startswith("test")
-                or settings.OPENAI_API_KEY == "your-openai-api-key"
-            ):
-                return self._create_mock_remediation(
-                    concept, target_gap, student_profile, original_exercise, evaluation
-                )
+            # Build unified prompt
+            prompt = self._build_prompt(
+                concept,
+                target_gap,
+                student_profile,
+                original_exercise,
+                evaluation,
+                remediation_examples,
+            )
 
-            # Create enhanced prompt with examples if available, otherwise use standard prompt
-            if remediation_examples:
-                prompt = self._create_enhanced_remediation_prompt(
-                    concept,
-                    target_gap,
-                    student_profile,
-                    original_exercise,
-                    evaluation,
-                    remediation_examples,
-                )
-            else:
-                prompt = self._create_remediation_prompt(
-                    concept, target_gap, student_profile, original_exercise, evaluation
-                )
+            # Get system prompt
+            system_prompt = self._get_system_prompt()
 
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=settings.TEMPERATURE,
@@ -109,6 +107,100 @@ class RemediationGenerator:
             return self._create_mock_remediation(
                 concept, target_gap, student_profile, original_exercise, evaluation
             )
+
+    def _get_system_prompt(self) -> str:
+        """Get system prompt for remediation generation."""
+        return """
+        ## CORE IDENTITY
+        You are an expert educational remediation specialist who transforms learning gaps into growth opportunities through cognitive science-informed, personalized learning experiences.
+
+        ## MANDATORY REQUIREMENTS
+        You MUST create remediation that:
+        1. Addresses specific gaps through targeted, concrete practice opportunities
+        2. Provides scaffolded complexity with clear progression pathways
+        3. Incorporates spaced repetition and active recall principles
+        4. Offers multiple ways to demonstrate understanding
+        5. Includes metacognitive reflection and self-assessment tools
+
+        ## FORBIDDEN PRACTICES
+        You MUST NEVER:
+        1. Create generic explanations without targeted gap remediation
+        2. Provide remediation that doesn't connect authentically to student interests
+        3. Use abstract concepts without concrete application opportunities
+        4. Skip scaffolding steps or cognitive load management
+        5. Focus solely on fixing deficits without building on strengths
+
+        ## STRUCTURED OUTPUT FORMAT
+        Return JSON with:
+        - gap_analysis: Specific understanding gaps and underlying causes
+        - scaffolded_progression: Step-by-step learning pathway with increasing complexity
+        - practice_opportunities: Concrete exercises using spaced repetition principles
+        - multiple_modalities: Various ways to demonstrate and apply understanding
+        - metacognitive_tools: Self-reflection and assessment opportunities
+        - strength_connections: How current abilities support gap remediation
+
+        ## THINKING PROCESS
+        Before generating remediation:
+        1. Analyze specific gaps in student's understanding assemblage
+        2. Design scaffolded progression from current ability to target understanding
+        3. Create multiple practice opportunities with spaced repetition
+        4. Ensure authentic connection to student interests and contexts
+        5. Include metacognitive reflection and self-assessment opportunities
+        """
+
+    def _build_prompt(
+        self,
+        concept: Dict[str, Any],
+        target_gap: str,
+        student_profile: Dict[str, Any],
+        original_exercise: Dict[str, Any],
+        evaluation: Dict[str, Any],
+        remediation_examples: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """Single prompt builder with optional enhanced/context features."""
+        interests = student_profile.get("interests", [])
+
+        # Base prompt construction
+        prompt = f"""Create targeted remediation content for this learning gap:
+        
+        Concept: {concept.get('name')}
+        Specific Gap: {target_gap}
+        
+        Student Profile:
+        - Interests: {', '.join(interests)}
+        - Current Understanding Score: {evaluation.get('understanding_score', 0)}
+        
+        Original Exercise Context:
+        {original_exercise.get('content', {}).get('scenario', '')}
+        
+        Student's Response Issues:
+        - Missing Steps: {evaluation.get('competency_map', {}).get('missing_steps', [])}
+        - Incorrect Steps: {evaluation.get('competency_map', {}).get('incorrect_steps', [])}
+        """
+
+        # Add remediation examples from vector search if available
+        if remediation_examples:
+            prompt += "\n\nRelevant Examples and Explanations:\n"
+            for i, example in enumerate(remediation_examples[:2]):
+                content = example.get("content", "")
+                if isinstance(content, str):
+                    prompt += f"Example {i+1}: {content[:400]}...\n"
+                else:
+                    prompt += f"Example {i+1}: {str(content)[:400]}...\n"
+
+        prompt += f"""
+        
+        Create remediation that:
+        1. Specifically addresses "{target_gap}"
+        2. Uses their interests: {', '.join(interests)}
+        3. Builds on what they did correctly
+        4. Provides scaffolded practice{"using the examples above" if remediation_examples else ""}
+        5. Rebuilds confidence
+        {"6. Uses the provided examples to ensure accuracy" if remediation_examples else ""}
+        
+        Make it encouraging and accessible."""
+
+        return prompt
 
     def _create_mock_remediation(
         self,
@@ -172,133 +264,3 @@ class RemediationGenerator:
         )
 
         return remediation
-
-    def _get_system_prompt(self) -> str:
-        """Get system prompt for remediation generation."""
-        return """
-        ## CORE IDENTITY
-        You are an expert educational remediation specialist who transforms learning gaps into growth opportunities through cognitive science-informed, personalized learning experiences.
-
-        ## MANDATORY REQUIREMENTS
-        You MUST create remediation that:
-        1. Addresses specific gaps through targeted, concrete practice opportunities
-        2. Provides scaffolded complexity with clear progression pathways
-        3. Incorporates spaced repetition and active recall principles
-        4. Offers multiple ways to demonstrate understanding
-        5. Includes metacognitive reflection and self-assessment tools
-
-        ## FORBIDDEN PRACTICES
-        You MUST NEVER:
-        1. Create generic explanations without targeted gap remediation
-        2. Provide remediation that doesn't connect authentically to student interests
-        3. Use abstract concepts without concrete application opportunities
-        4. Skip scaffolding steps or cognitive load management
-        5. Focus solely on fixing deficits without building on strengths
-
-        ## STRUCTURED OUTPUT FORMAT
-        Return JSON with:
-        - gap_analysis: Specific understanding gaps and underlying causes
-        - scaffolded_progression: Step-by-step learning pathway with increasing complexity
-        - practice_opportunities: Concrete exercises using spaced repetition principles
-        - multiple_modalities: Various ways to demonstrate and apply understanding
-        - metacognitive_tools: Self-reflection and assessment opportunities
-        - strength_connections: How current abilities support gap remediation
-
-        ## THINKING PROCESS
-        Before generating remediation:
-        1. Analyze specific gaps in student's understanding assemblage
-        2. Design scaffolded progression from current ability to target understanding
-        3. Create multiple practice opportunities with spaced repetition
-        4. Ensure authentic connection to student interests and contexts
-        5. Include metacognitive reflection and self-assessment opportunities
-        """
-
-    def _create_remediation_prompt(
-        self,
-        concept: Dict[str, Any],
-        target_gap: str,
-        student_profile: Dict[str, Any],
-        original_exercise: Dict[str, Any],
-        evaluation: Dict[str, Any],
-    ) -> str:
-        """Create prompt for remediation generation."""
-        interests = student_profile.get("interests", [])
-
-        prompt = f"""Create targeted remediation content for this learning gap:
-        
-        Concept: {concept.get('name')}
-        Specific Gap: {target_gap}
-        
-        Student Profile:
-        - Interests: {', '.join(interests)}
-        - Current Understanding Score: {evaluation.get('understanding_score', 0)}
-        
-        Original Exercise Context:
-        {original_exercise.get('content', {}).get('scenario', '')}
-        
-        Student's Response Issues:
-        - Missing Steps: {evaluation.get('competency_map', {}).get('missing_steps', [])}
-        - Incorrect Steps: {evaluation.get('competency_map', {}).get('incorrect_steps', [])}
-        
-        Create remediation that:
-        1. Specifically addresses "{target_gap}"
-        2. Uses their interests: {', '.join(interests)}
-        3. Builds on what they did correctly
-        4. Provides scaffolded practice
-        5. Rebuilds confidence
-        
-        Make it encouraging and accessible."""
-
-        return prompt
-
-    def _create_enhanced_remediation_prompt(
-        self,
-        concept: Dict[str, Any],
-        target_gap: str,
-        student_profile: Dict[str, Any],
-        original_exercise: Dict[str, Any],
-        evaluation: Dict[str, Any],
-        remediation_examples: List[Dict[str, Any]],
-    ) -> str:
-        """Create enhanced remediation prompt with examples."""
-        interests = student_profile.get("interests", [])
-
-        prompt = f"""Create targeted remediation content for this learning gap:
-        
-        Concept: {concept.get('name')}
-        Specific Gap: {target_gap}
-        
-        Student Profile:
-        - Interests: {', '.join(interests)}
-        - Current Understanding Score: {evaluation.get('understanding_score', 0)}
-        
-        Original Exercise Context:
-        {original_exercise.get('content', {}).get('scenario', '')}
-        
-        Student's Response Issues:
-        - Missing Steps: {evaluation.get('competency_map', {}).get('missing_steps', [])}
-        - Incorrect Steps: {evaluation.get('competency_map', {}).get('incorrect_steps', [])}
-        """
-
-        # Add remediation examples from vector search
-        if remediation_examples:
-            prompt += "\n\nRelevant Examples and Explanations:\n"
-            for i, example in enumerate(remediation_examples[:2]):
-                content = example.get("content", "")
-                if isinstance(content, str):
-                    prompt += f"Example {i+1}: {content[:400]}...\n"
-                else:
-                    prompt += f"Example {i+1}: {str(content)[:400]}...\n"
-
-        prompt += f"""
-        Create remediation that:
-        1. Specifically addresses "{target_gap}"
-        2. Uses their interests: {', '.join(interests)}
-        3. Builds on what they did correctly
-        4. Provides scaffolded practice using the examples above
-        5. Rebuilds confidence
-        6. Uses the provided examples to ensure accuracy
-        
-        Make it encouraging and accessible."""
-
-        return prompt
