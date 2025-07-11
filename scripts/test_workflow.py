@@ -355,7 +355,7 @@ class ExerciseWorkflowTester:
         )
         
         print(f"   ✅ Evaluation complete: {evaluation['evaluation_id']}")
-        print(f"   📊 Understanding score: {evaluation['understanding_score']:.2f}/10")
+        print(f"   📊 Understanding score: {evaluation['understanding_score']:.1%} ({evaluation['understanding_score']:.2f}/1.0)")
         print(f"   🎯 Mastery achieved: {evaluation['mastery_achieved']}")
         print(f"   🔄 Needs remediation: {evaluation['needs_remediation']}")
         
@@ -626,7 +626,7 @@ This test follows the **correct workflow**:
             remediation_rate = sum(1 for r in scenario_results if r['result']['final_data']['evaluation']['needs_remediation']) / len(scenario_results)
             
             report += f"**{scenario['name']}**:\n"
-            report += f"- Average Understanding Score: {avg_score:.1%} ({avg_score*10:.1f}/10)\n"
+            report += f"- Average Understanding Score: {avg_score:.1%} ({avg_score:.2f}/1.0)\n"
             report += f"- Mastery Achievement Rate: {mastery_rate:.1%}\n"
             report += f"- Remediation Required Rate: {remediation_rate:.1%}\n"
             report += f"- Tests Conducted: {len(scenario_results)} (across all personalities)\n\n"
@@ -643,7 +643,7 @@ This test follows the **correct workflow**:
             mastery_rate = sum(1 for r in personality_results if r['result']['final_data']['evaluation']['mastery_achieved']) / len(personality_results)
             
             report += f"**{personality}**:\n"
-            report += f"- Average Understanding Score: {avg_score:.1%} ({avg_score*10:.1f}/10)\n"
+            report += f"- Average Understanding Score: {avg_score:.1%} ({avg_score:.2f}/1.0)\n"
             report += f"- Mastery Achievement Rate: {mastery_rate:.1%}\n"
             report += f"- Tests Conducted: {len(personality_results)}\n\n"
         
@@ -690,7 +690,7 @@ This test follows the **correct workflow**:
                 # Show evaluation
                 evaluation = result['final_data']['evaluation']
                 report += f"**📊 AI Evaluation**:\n"
-                report += f"- **Understanding Score**: {evaluation['understanding_score']:.1%} ({evaluation['understanding_score']*10:.1f}/10)\n"
+                report += f"- **Understanding Score**: {evaluation['understanding_score']:.1%} ({evaluation['understanding_score']:.2f}/1.0)\n"
                 report += f"- **Mastery Achieved**: {'✅ Yes' if evaluation['mastery_achieved'] else '❌ No'}\n"
                 report += f"- **Needs Remediation**: {'⚠️ Yes' if evaluation['needs_remediation'] else '✅ No'}\n"
                 

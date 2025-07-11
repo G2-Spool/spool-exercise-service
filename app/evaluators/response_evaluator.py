@@ -110,8 +110,12 @@ class ResponseEvaluator:
                     
                     # Ensure score is in 0-1 range
                     explicit_score = float(explicit_score)
+                    # Only normalize if score is actually > 1 (not already normalized)
                     if explicit_score > 1:
-                        explicit_score = explicit_score / 10 if explicit_score <= 10 else explicit_score / 100
+                        if explicit_score <= 10:
+                            explicit_score = explicit_score / 10  # 8 -> 0.8
+                        else:
+                            explicit_score = explicit_score / 100  # 80 -> 0.8
                     
                     explicit_score = min(max(explicit_score, 0.0), 1.0)
                 except (ValueError, TypeError):
