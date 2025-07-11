@@ -6,7 +6,7 @@ import math
 import resource
 import threading
 import time
-from typing import Dict, Any, Union, List
+from typing import Dict, Any, Union, List, cast, Callable
 import structlog
 
 logger = structlog.get_logger()
@@ -240,7 +240,7 @@ class SecureCalculatorTool:
                     "memory_safe": True,
                 }
 
-            return self._execute_with_timeout(_do_calculation)
+            return cast(Dict[str, Any], self._execute_with_timeout(_do_calculation))
 
         except TimeoutError:
             return {
@@ -264,12 +264,12 @@ class SecureCalculatorTool:
             value = node.value
             if not self._validate_number(value):
                 raise ValueError("Number too large for safe evaluation")
-            return value
+            return cast(Union[int, float, complex], value)
         elif isinstance(node, ast.Num):  # For Python < 3.8 compatibility
             value = node.n
             if not self._validate_number(value):
                 raise ValueError("Number too large for safe evaluation")
-            return value
+            return cast(Union[int, float, complex], value)
         elif isinstance(node, ast.BinOp):
             left = self._safe_eval(node.left)
             right = self._safe_eval(node.right)
@@ -285,7 +285,8 @@ class SecureCalculatorTool:
                     )
 
             if type(node.op) in self.SAFE_OPERATORS:
-                result = self.SAFE_OPERATORS[type(node.op)](left, right)
+                op_func = cast(Callable[[Any, Any], Union[int, float, complex]], self.SAFE_OPERATORS[type(node.op)])
+                result = op_func(left, right)
                 if not self._validate_number(result):
                     raise ValueError("Result too large for safe handling")
                 return result
@@ -294,7 +295,8 @@ class SecureCalculatorTool:
         elif isinstance(node, ast.UnaryOp):
             operand = self._safe_eval(node.operand)
             if type(node.op) in self.SAFE_OPERATORS:
-                result = self.SAFE_OPERATORS[type(node.op)](operand)
+                unary_op_func = cast(Callable[[Any], Union[int, float, complex]], self.SAFE_OPERATORS[type(node.op)])
+                result = unary_op_func(operand)
                 if not self._validate_number(result):
                     raise ValueError("Result too large for safe handling")
                 return result
@@ -327,7 +329,8 @@ class SecureCalculatorTool:
                                 f"Power exponent too large (max {self.max_power_exponent})"
                             )
 
-                    result = self.SAFE_FUNCTIONS[func_name](*args)
+                    func = cast(Callable[..., Union[int, float, complex]], self.SAFE_FUNCTIONS[func_name])
+                    result = func(*args)
                     if not self._validate_number(result):
                         raise ValueError("Function result too large for safe handling")
                     return result
@@ -336,8 +339,11 @@ class SecureCalculatorTool:
             else:
                 raise ValueError("Only simple function calls are supported")
         elif isinstance(node, ast.Name):
-            if node.id in self.SAFE_FUNCTIONS:
-                return self.SAFE_FUNCTIONS[node.id]
+            # Handle mathematical constants
+            if node.id == "pi":
+                return math.pi
+            elif node.id == "e":
+                return math.e
             else:
                 raise ValueError(f"Unsupported name: {node.id}")
         elif isinstance(node, ast.List):
@@ -346,10 +352,10 @@ class SecureCalculatorTool:
                 raise ValueError("List too large for safe handling")
             return elements
         elif isinstance(node, ast.Tuple):
-            elements = tuple(self._safe_eval(item) for item in node.elts)
-            if len(elements) > 10000:  # Limit tuple size
+            elements_list = [self._safe_eval(item) for item in node.elts]
+            if len(elements_list) > 10000:  # Limit tuple size
                 raise ValueError("Tuple too large for safe handling")
-            return elements
+            return tuple(elements_list)
         else:
             raise ValueError(f"Unsupported node type: {type(node)}")
 
@@ -434,12 +440,12 @@ class SecureCalculatorTool:
                     }
                 else:
                     # Complex solutions
-                    real_part = -b / (2 * a)
-                    imag_part = math.sqrt(-discriminant) / (2 * a)
-                    x1 = complex(real_part, imag_part)
-                    x2 = complex(real_part, -imag_part)
+                    real_part: float = -b / (2 * a)
+                    imag_part: float = math.sqrt(-discriminant) / (2 * a)
+                    x1_complex: complex = complex(real_part, imag_part)
+                    x2_complex: complex = complex(real_part, -imag_part)
 
-                    if not (self._validate_number(x1) and self._validate_number(x2)):
+                    if not (self._validate_number(x1_complex) and self._validate_number(x2_complex)):
                         raise ValueError(
                             "Complex solutions too large for safe handling"
                         )
@@ -447,13 +453,13 @@ class SecureCalculatorTool:
                     return {
                         "success": True,
                         "type": "quadratic",
-                        "solutions": [x1, x2],
+                        "solutions": [x1_complex, x2_complex],
                         "discriminant": discriminant,
                         "equation": f"{a}x² + {b}x + {c} = 0",
                         "memory_safe": True,
                     }
 
-            return self._execute_with_timeout(_do_quadratic_solve)
+            return cast(Dict[str, Any], self._execute_with_timeout(_do_quadratic_solve))
 
         except TimeoutError:
             return {
