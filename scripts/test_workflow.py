@@ -391,9 +391,10 @@ class ExerciseWorkflowTester:
 
         # Step 4: Evaluate the student response
         print("\n3️⃣ Evaluating student response...")
+        print("   🔧 Using HARDCODED exercise for consistent evaluator testing")
 
         evaluation = await self.evaluator.evaluate(
-            generated_exercise, student_response, self.test_concept
+            self.hardcoded_exercise, student_response, self.test_concept
         )
 
         print(f"   ✅ Evaluation complete: {evaluation['evaluation_id']}")
@@ -425,7 +426,7 @@ class ExerciseWorkflowTester:
                 self.test_concept,
                 "comprehensive understanding",
                 student_profile,
-                generated_exercise,
+                self.hardcoded_exercise,
                 evaluation,
             )
 
@@ -464,10 +465,16 @@ class ExerciseWorkflowTester:
                 "remediation": remediation_log,
             },
             "final_data": {
-                "exercise": generated_exercise,
+                "generated_exercise": generated_exercise,
+                "hardcoded_exercise": self.hardcoded_exercise,
                 "student_response": student_response,
                 "evaluation": evaluation,
                 "remediation": remediation,
+            },
+            "test_details": {
+                "exercise_for_personalization": "generated_exercise",
+                "exercise_for_evaluation": "hardcoded_exercise",
+                "exercise_for_remediation": "hardcoded_exercise",
             },
             "workflow_completed": True,
             "total_steps": 4 if not evaluation["needs_remediation"] else 5,
@@ -624,11 +631,13 @@ Just give me the answer so I can move on to the next problem.
 ## 🔬 Test Methodology
 
 This test follows the **correct workflow**:
-1. **Generate Personalized Exercise** - Create exercises tailored to each student's interests
+1. **Generate Personalized Exercise** - Create exercises tailored to each student's interests (tests personalization)
 2. **Apply Hardcoded Responses** - Use consistent student responses across all tests  
-3. **Evaluate Responses** - Assess understanding and identify gaps using LLM evaluation
-4. **Generate Remediation** - Create targeted help when needed
+3. **Evaluate Responses** - Assess understanding using hardcoded exercise (tests evaluation accuracy)
+4. **Generate Remediation** - Create targeted help when needed (tests remediation quality)
 5. **Log Everything** - Capture all LLM interactions for analysis
+
+**CRITICAL**: The evaluator and remediation generator use the hardcoded exercise for consistent testing, while the exercise generator creates personalized exercises to test personalization capabilities.
 
 ## 📚 Test Subject: {self.test_concept['name']}
 
@@ -736,23 +745,29 @@ This test follows the **correct workflow**:
                 report += f"#### 👤 {scenario['name']} Test\n\n"
 
                 # Show exercise details
-                exercise = result["final_data"]["exercise"]
-                report += f"**🎯 Exercise Used ({result.get('exercise_source', 'unknown')})**:\n"
-                report += f"- **Exercise ID**: {exercise['exercise_id']}\n"
-                report += f"- **Interests Applied**: {', '.join(exercise['personalization']['interests_used'])}\n"
-                report += f"- **Scenario**: {exercise['content']['scenario']}\n"
-                report += f"- **Problem**: {exercise['content']['problem']}\n\n"
+                generated_exercise = result["final_data"]["generated_exercise"]
+                hardcoded_exercise = result["final_data"]["hardcoded_exercise"]
+                
+                report += f"**🎯 Generated Exercise (Personalization Test)**:\n"
+                report += f"- **Exercise ID**: {generated_exercise['exercise_id']}\n"
+                report += f"- **Interests Applied**: {', '.join(generated_exercise['personalization']['interests_used'])}\n"
+                report += f"- **Scenario**: {generated_exercise['content']['scenario']}\n"
+                report += f"- **Problem**: {generated_exercise['content']['problem']}\n\n"
+                
+                report += f"**🔧 Hardcoded Exercise (Evaluation Test)**:\n"
+                report += f"- **Exercise ID**: {hardcoded_exercise['exercise_id']}\n"
+                report += f"- **Problem**: {hardcoded_exercise['content']['problem']}\n\n"
 
-                report += "**📝 Expected Steps**:\n"
-                for i, step in enumerate(exercise["content"]["expected_steps"], 1):
+                report += "**📝 Expected Steps (Hardcoded Exercise)**:\n"
+                for i, step in enumerate(hardcoded_exercise["content"]["expected_steps"], 1):
                     report += f"{i}. {step}\n"
 
-                report += "\n**💡 Hints Available**:\n"
-                hints = exercise["content"].get("hints", [])
+                report += "\n**💡 Hints Available (Hardcoded Exercise)**:\n"
+                hints = hardcoded_exercise["content"].get("hints", [])
                 for i, hint in enumerate(hints, 1):
                     report += f"{i}. {hint}\n"
 
-                report += f"\n**🎯 Success Criteria**: {exercise['content']['success_criteria']}\n\n"
+                report += f"\n**🎯 Success Criteria (Hardcoded Exercise)**: {hardcoded_exercise['content']['success_criteria']}\n\n"
 
                 # Show student response
                 student_response = result["final_data"]["student_response"]
