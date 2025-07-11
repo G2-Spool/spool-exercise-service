@@ -10,17 +10,19 @@ import structlog
 from app.core.config import settings
 from app.services.pinecone_service import PineconeExerciseService
 from app.resources.personalities import personality_loader
+from app.core.prompts import ChainOfThoughtPrompts
 
 logger = structlog.get_logger()
 
 
 class ExerciseGenerator:
-    """Generate personalized exercises using LLMs."""
+    """Generate personalized exercises using LLMs with enhanced chain-of-thought prompting."""
 
     def __init__(self) -> None:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.GENERATION_MODEL
         self.pinecone_service = PineconeExerciseService()
+        self.chain_of_thought = ChainOfThoughtPrompts()
 
     async def generate(
         self,
@@ -30,8 +32,9 @@ class ExerciseGenerator:
         difficulty: str = "basic",
         exercise_type: str = "initial",
         personality: Optional[str] = None,
+        use_enhanced_prompts: bool = True,
     ) -> Dict[str, Any]:
-        """Generate a personalized exercise with vector context."""
+        """Generate a personalized exercise with enhanced chain-of-thought prompting."""
         try:
             # Get relevant context from Pinecone
             context_chunks = await self.pinecone_service.get_concept_context(
@@ -56,8 +59,18 @@ class ExerciseGenerator:
                     concept, student_profile, life_category, difficulty, exercise_type
                 )
 
-            # Create enhanced prompt with context if available, otherwise use standard prompt
-            if context_chunks or similar_exercises:
+            # Create enhanced prompt with chain-of-thought strategies
+            if use_enhanced_prompts and (context_chunks or similar_exercises):
+                prompt = self.chain_of_thought.create_enhanced_exercise_prompt(
+                    concept,
+                    student_profile,
+                    context_chunks,
+                    life_category=life_category,
+                    difficulty=difficulty,
+                    exercise_type=exercise_type,
+                    similar_exercises=similar_exercises,
+                )
+            elif context_chunks or similar_exercises:
                 prompt = self._create_enhanced_generation_prompt(
                     concept,
                     student_profile,
@@ -72,10 +85,13 @@ class ExerciseGenerator:
                     concept, student_profile, life_category, difficulty, exercise_type
                 )
 
+            # Enhanced system prompt with chain-of-thought instructions
+            system_prompt = self._get_enhanced_system_prompt(personality, use_enhanced_prompts)
+
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self._get_system_prompt(personality)},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=settings.TEMPERATURE,
@@ -100,17 +116,20 @@ class ExerciseGenerator:
                     "interests_used": student_profile.get("interests", []),
                     "life_category": life_category,
                     "context": exercise_content.get("personalized_context"),
+                    "enhanced_prompting": use_enhanced_prompts,
                 },
                 "expected_steps": exercise_content.get("expected_steps", []),
                 "hints": exercise_content.get("hints", []),
                 "created_at": datetime.utcnow().isoformat(),
+                "llm_response_raw": content,  # Store raw response for analysis
             }
 
             logger.info(
-                "Generated exercise",
+                "Generated exercise with enhanced prompting",
                 exercise_id=exercise["exercise_id"],
                 concept_id=concept.get("concept_id"),
                 difficulty=difficulty,
+                enhanced_prompts=use_enhanced_prompts,
             )
 
             return exercise
@@ -178,8 +197,8 @@ class ExerciseGenerator:
 
         return exercise
 
-    def _get_system_prompt(self, personality: Optional[str] = None) -> str:
-        """Get system prompt for exercise generation with optional personality."""
+    def _get_enhanced_system_prompt(self, personality: Optional[str] = None, use_enhanced_prompts: bool = True) -> str:
+        """Get enhanced system prompt for exercise generation with optional personality."""
         base_prompt = """
         ## CORE IDENTITY
         You are an expert educational content creator specializing in authentic, performance-based assessment that connects academic concepts to students' real interests and contexts.
@@ -218,7 +237,35 @@ class ExerciseGenerator:
         5. Create opportunities for student agency and choice within structure
         """
 
-        return personality_loader.apply_personality_to_prompt(base_prompt, personality)
+        if use_enhanced_prompts:
+            enhanced_base = base_prompt + """
+            
+        ## ENHANCED CHAIN-OF-THOUGHT PROMPTING
+        When creating exercises, follow this enhanced process:
+        
+        ### Step 1: Analyze and Plan
+        - Break down the concept into teachable components
+        - Identify student interests that authentically connect
+        - Plan the problem structure and expected learning path
+        
+        ### Step 2: Design with Scaffolding
+        - Create clear intermediate questions that build understanding
+        - Design self-check opportunities throughout the problem
+        - Provide worked example format students should follow
+        
+        ### Step 3: Include Reflection Components
+        - Add metacognitive prompts for self-assessment
+        - Include verification steps students should perform
+        - Create opportunities for alternative approach consideration
+        
+        ### Step 4: Verify and Refine
+        - Ensure the problem requires deep reasoning, not just recall
+        - Check that all steps logically build toward mastery
+        - Confirm authentic connection to student interests
+        """
+            return personality_loader.apply_personality_to_prompt(enhanced_base, personality)
+        else:
+            return personality_loader.apply_personality_to_prompt(base_prompt, personality)
 
     def _create_generation_prompt(
         self,

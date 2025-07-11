@@ -9,22 +9,25 @@ import structlog
 
 from app.core.config import settings
 from app.services.pinecone_service import PineconeExerciseService
+from app.core.prompts import ChainOfThoughtPrompts
 
 logger = structlog.get_logger()
 
 
 class ResponseEvaluator:
-    """Evaluate student responses using LLMs."""
+    """Evaluate student responses using LLMs with enhanced chain-of-thought prompting."""
 
     def __init__(self) -> None:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = settings.EVALUATION_MODEL
         self.pinecone_service = PineconeExerciseService()
+        self.chain_of_thought = ChainOfThoughtPrompts()
 
     async def evaluate(
-        self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any]
+        self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any],
+        use_enhanced_prompts: bool = True
     ) -> Dict[str, Any]:
-        """Evaluate a student's response with enhanced context."""
+        """Evaluate a student's response with enhanced context and chain-of-thought prompting."""
         try:
             # Get concept context for better evaluation
             context_chunks = await self.pinecone_service.get_concept_context(
@@ -48,8 +51,12 @@ class ResponseEvaluator:
             ):
                 return self._create_mock_evaluation(exercise, student_response, concept)
 
-            # Create enhanced prompt with context if available, otherwise use standard prompt
-            if context_chunks:
+            # Create enhanced prompt with chain-of-thought strategies
+            if use_enhanced_prompts and context_chunks:
+                prompt = self.chain_of_thought.create_enhanced_evaluation_prompt(
+                    exercise, student_response, concept, context_chunks
+                )
+            elif context_chunks:
                 prompt = self._create_enhanced_evaluation_prompt(
                     exercise, student_response, concept, context_chunks
                 )
@@ -58,10 +65,13 @@ class ResponseEvaluator:
                     exercise, student_response, concept
                 )
 
+            # Enhanced system prompt with chain-of-thought instructions
+            system_prompt = self._get_enhanced_system_prompt(use_enhanced_prompts)
+
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.3,  # Lower temperature for more consistent evaluation
@@ -430,6 +440,47 @@ class ResponseEvaluator:
         4. Generate specific, actionable feedback for improvement
         5. Consider multiple valid approaches while maintaining rigor
         """
+    
+    def _get_enhanced_system_prompt(self, use_enhanced_prompts: bool = True) -> str:
+        """Get enhanced system prompt for response evaluation."""
+        base_prompt = self._get_system_prompt()
+        
+        if use_enhanced_prompts:
+            enhanced_prompt = base_prompt + """
+            
+        ## ENHANCED CHAIN-OF-THOUGHT EVALUATION PROCESS
+        When evaluating responses, follow this enhanced process:
+        
+        ### Step 1: Systematic Analysis
+        - First, read the entire response to understand the student's approach
+        - Identify the main strategy or method the student used
+        - Note any mathematical or logical reasoning demonstrated
+        
+        ### Step 2: Step-by-Step Verification
+        - Break down the response into individual steps or components
+        - Verify each step against the expected solution path
+        - Check mathematical accuracy and logical flow
+        
+        ### Step 3: Understanding Assessment
+        - Evaluate conceptual understanding vs. procedural execution
+        - Identify gaps between what the student knows and what they demonstrated
+        - Assess whether errors are conceptual or computational
+        
+        ### Step 4: Comprehensive Scoring
+        - Assign understanding score based on demonstrated mastery
+        - Consider multiple valid approaches and partial credit
+        - Ensure scoring reflects depth of understanding, not just correctness
+        
+        ### Step 5: Feedback Generation
+        - Provide specific, actionable feedback for improvement
+        - Highlight strengths and build confidence
+        - Suggest next steps for continued learning
+        
+        **Critical**: Always show your reasoning process and explicitly state "Understanding score: X/10" in your analysis.
+        """
+            return enhanced_prompt
+        else:
+            return base_prompt
 
     def _create_evaluation_prompt(
         self, exercise: Dict[str, Any], student_response: str, concept: Dict[str, Any]
