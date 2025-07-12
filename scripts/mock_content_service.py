@@ -24,96 +24,63 @@ except ImportError:
 # Mock educational content chunks
 MOCK_CONTENT_CHUNKS = [
     {
-        "concept_id": "quadratic_001",
-        "content": "Quadratic equations are polynomial equations of degree 2. They have the general form ax² + bx + c = 0 where a ≠ 0. These equations are fundamental in algebra and appear frequently in physics, engineering, and other mathematical applications.",
+        "concept_id": "linear_systems_001",
+        "content": "A system of linear equations consists of two or more linear equations with the same variables. The goal is to find a common solution that satisfies all equations simultaneously. These systems are crucial for modeling real-world problems in fields like economics, engineering, and computer science.",
         "score": 0.95,
-        "book": "Algebra Fundamentals",
+        "book": "Linear Algebra Essentials",
         "subject": "Mathematics",
-        "concept_name": "Quadratic Equations Basics",
+        "concept_name": "Introduction to Systems of Linear Equations",
         "concept_type": "explanation",
-        "chapter_title": "Polynomial Equations",
-        "section_title": "Introduction to Quadratic Equations"
+        "chapter_title": "Linear Systems",
+        "section_title": "Core Concepts"
     },
     {
-        "concept_id": "quadratic_002", 
-        "content": "To solve quadratic equations, we can use several methods: factoring, completing the square, or the quadratic formula. The quadratic formula x = (-b ± √(b² - 4ac)) / 2a works for all quadratic equations and is especially useful when factoring is difficult.",
+        "concept_id": "linear_systems_002",
+        "content": "There are three primary methods for solving systems of linear equations: substitution, elimination, and graphing. The substitution method involves solving one equation for one variable and substituting that expression into the other equation. The elimination method involves adding or subtracting the equations to eliminate one variable.",
         "score": 0.92,
-        "book": "Algebra Problem Solving",
-        "subject": "Mathematics", 
-        "concept_name": "Quadratic Solution Methods",
+        "book": "Linear Algebra Problem Solving",
+        "subject": "Mathematics",
+        "concept_name": "Methods for Solving Linear Systems",
         "concept_type": "explanation",
-        "chapter_title": "Solving Equations",
-        "section_title": "Quadratic Formula"
+        "chapter_title": "Solving Systems",
+        "section_title": "Substitution and Elimination"
     },
     {
-        "concept_id": "quadratic_sports_001",
-        "content": "Quadratic equations model projectile motion in sports. When a basketball player shoots a free throw, the ball follows a parabolic path described by a quadratic equation. The trajectory depends on initial velocity, angle, and gravity.",
+        "concept_id": "linear_systems_sports_001",
+        "content": "In sports analytics, systems of linear equations are used to model team performance and player statistics. For example, you could create a system to determine how many 2-point and 3-point shots a basketball team made based on their total shots and total points.",
         "score": 0.89,
         "book": "Mathematics in Sports",
         "subject": "Applied Mathematics",
-        "concept_name": "Projectile Motion in Sports",
+        "concept_name": "Sports Analytics with Linear Systems",
         "concept_type": "application",
-        "chapter_title": "Physics of Sports",
-        "section_title": "Ball Trajectories"
+        "chapter_title": "Statistical Modeling",
+        "section_title": "Performance Metrics"
     },
     {
-        "concept_id": "quadratic_music_001",
-        "content": "Musical acoustics uses quadratic equations to model sound wave interactions and resonance frequencies. When designing concert halls or audio equipment, engineers use quadratic relationships to optimize sound quality and minimize distortion.",
-        "score": 0.87,
-        "book": "Mathematical Music Theory",
-        "subject": "Applied Mathematics",
-        "concept_name": "Sound Wave Mathematics",
-        "concept_type": "application", 
-        "chapter_title": "Acoustic Engineering",
-        "section_title": "Resonance and Frequency"
-    },
-    {
-        "concept_id": "quadratic_technology_001",
-        "content": "In computer graphics and game development, quadratic equations are used for collision detection, curve rendering, and physics simulations. Bezier curves, which are quadratic functions, create smooth animations and realistic movement patterns.",
-        "score": 0.85,
-        "book": "Mathematics in Computer Science",
-        "subject": "Computational Mathematics",
-        "concept_name": "Quadratic Functions in Graphics",
-        "concept_type": "application",
-        "chapter_title": "Computer Graphics Math",
-        "section_title": "Curves and Collisions"
-    },
-    {
-        "concept_id": "quadratic_example_001",
-        "content": "Example: Solve x² + 5x + 6 = 0. We can factor this as (x + 2)(x + 3) = 0, giving us solutions x = -2 and x = -3. We can verify by substituting back: (-2)² + 5(-2) + 6 = 4 - 10 + 6 = 0 ✓",
+        "concept_id": "linear_systems_example_001",
+        "content": "Example: Solve the system: 1) x + y = 10, 2) x - y = 4. Using elimination, add the two equations: (x + y) + (x - y) = 10 + 4, which simplifies to 2x = 14, so x = 7. Substitute x = 7 into the first equation: 7 + y = 10, which gives y = 3. The solution is (7, 3).",
         "score": 0.94,
-        "book": "Step-by-Step Algebra",
+        "book": "Step-by-Step Linear Algebra",
         "subject": "Mathematics",
-        "concept_name": "Quadratic Factoring Example",
+        "concept_name": "Solving a Linear System by Elimination",
         "concept_type": "example",
         "chapter_title": "Worked Examples",
-        "section_title": "Factoring Practice"
+        "section_title": "Elimination Method Practice"
     }
 ]
 
 # Mock remediation examples
 MOCK_REMEDIATION_EXAMPLES = [
     {
-        "concept_id": "remediation_001",
-        "content": "When students struggle with quadratic equations, break down the solution process into clear steps: 1) Identify the standard form ax² + bx + c = 0, 2) Choose the best solution method (factoring, completing the square, or quadratic formula), 3) Apply the method systematically, 4) Check your answers by substituting back into the original equation.",
+        "concept_id": "remediation_linear_systems_001",
+        "content": "When students struggle with systems of linear equations, it's often due to calculation errors or choosing the wrong method. Encourage them to check their work by substituting the final x and y values back into both original equations. Visualizing the problem by graphing the lines can also help build intuition.",
         "score": 0.96,
-        "book": "Teaching Algebra Effectively",
+        "book": "Teaching Linear Algebra",
         "subject": "Mathematical Pedagogy",
-        "concept_name": "Quadratic Equation Teaching Strategy",
+        "concept_name": "Teaching Strategies for Linear Systems",
         "concept_type": "explanation",
         "chapter_title": "Common Student Difficulties",
-        "section_title": "Systematic Problem Solving"
-    },
-    {
-        "concept_id": "remediation_002",
-        "content": "Common mistakes with quadratic equations include: forgetting to set the equation equal to zero, arithmetic errors in the quadratic formula, and not checking both solutions. Use visual aids like graphs to help students understand that quadratic equations typically have two solutions.",
-        "score": 0.93,
-        "book": "Algebra Teaching Guide",
-        "subject": "Mathematical Education",
-        "concept_name": "Common Quadratic Mistakes",
-        "concept_type": "explanation",
-        "chapter_title": "Error Analysis",
-        "section_title": "Student Misconceptions"
+        "section_title": "Verification and Visualization"
     }
 ]
 
@@ -136,54 +103,18 @@ def create_mock_app():
             body = await request.json()
             query = body.get("query", "")
             limit = body.get("limit", 3)
-            filters = body.get("filters", {})
             
             print(f"🔍 Mock Content Service: Searching for '{query}' (limit: {limit})")
             
             # Select appropriate mock content based on query
             if "remediation" in query.lower() or "examples" in query.lower():
-                available_chunks = MOCK_REMEDIATION_EXAMPLES
+                results = MOCK_REMEDIATION_EXAMPLES
             else:
-                available_chunks = MOCK_CONTENT_CHUNKS
-            
-            # Filter by query keywords
-            relevant_chunks = []
-            query_lower = query.lower()
-            
-            for chunk in available_chunks:
-                # Simple keyword matching
-                content_lower = chunk["content"].lower()
-                name_lower = chunk["concept_name"].lower()
-                
-                relevance_score = 0
-                if "quadratic" in query_lower and "quadratic" in content_lower:
-                    relevance_score += 0.3
-                if "sports" in query_lower and "sports" in content_lower:
-                    relevance_score += 0.2
-                if "music" in query_lower and "music" in content_lower:
-                    relevance_score += 0.2
-                if "technology" in query_lower and "technology" in content_lower:
-                    relevance_score += 0.2
-                if "applications" in query_lower and "application" in chunk["concept_type"]:
-                    relevance_score += 0.2
-                if "basic" in query_lower and "basics" in name_lower:
-                    relevance_score += 0.2
-                
-                if relevance_score > 0:
-                    # Adjust score based on relevance
-                    adjusted_chunk = chunk.copy()
-                    adjusted_chunk["score"] = min(chunk["score"] + relevance_score, 1.0)
-                    relevant_chunks.append(adjusted_chunk)
-            
-            # Sort by score and limit results
-            relevant_chunks.sort(key=lambda x: x["score"], reverse=True)
-            results = relevant_chunks[:limit]
+                results = MOCK_CONTENT_CHUNKS
             
             print(f"✅ Mock Content Service: Returning {len(results)} results")
-            for i, result in enumerate(results):
-                print(f"   {i+1}. {result['concept_name']} (score: {result['score']:.2f})")
             
-            return results
+            return results[:limit]
             
         except Exception as e:
             print(f"❌ Mock Content Service Error: {str(e)}")
@@ -205,15 +136,18 @@ async def run_mock_server():
     print("   Press Ctrl+C to stop")
     
     app = create_mock_app()
-    config = uvicorn.Config(
-        app=app,
-        host="0.0.0.0",
-        port=8002,
-        log_level="info"
-    )
-    
-    server = uvicorn.Server(config)
-    await server.serve()
+    if app:
+        config = uvicorn.Config(
+            app=app,
+            host="0.0.0.0",
+            port=8002,
+            log_level="info"
+        )
+        
+        server = uvicorn.Server(config)
+        await server.serve()
+    else:
+        print("❌ Mock app could not be created. Shutting down.")
 
 if __name__ == "__main__":
     asyncio.run(run_mock_server()) 

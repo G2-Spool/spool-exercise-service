@@ -80,23 +80,24 @@ class MockServices:
                 },
                 "linear_equations": {
                     "concept_id": concept_id,
-                    "name": "Linear Equations",
-                    "description": "Solving equations of the form ax + b = 0",
-                    "content": "Linear equations are first-degree polynomial equations with one variable.",
+                    "name": "Systems of Linear Equations",
+                    "description": "Solving systems of equations with two or more variables",
+                    "content": "Systems of linear equations consist of multiple linear equations with the same variables that must be solved simultaneously.",
                     "learning_objectives": [
-                        "Understand linear equations",
-                        "Solve linear equations using algebraic methods",
-                        "Apply linear equations to real-world problems",
+                        "Understand systems of linear equations",
+                        "Solve systems using substitution and elimination methods",
+                        "Apply systems of linear equations to real-world problems",
+                        "Verify solutions by substituting back into original equations",
                     ],
                     "examples": [
                         {
-                            "equation": "2x + 3 = 7",
-                            "solution": "x = 2",
-                            "method": "algebraic",
+                            "equation": "2x + 3y = 16\nx - y = 2",
+                            "solution": "x = 4, y = 2",
+                            "method": "substitution",
                         }
                     ],
-                    "difficulty": "basic",
-                    "prerequisites": ["basic_algebra"],
+                    "difficulty": "intermediate",
+                    "prerequisites": ["basic_algebra", "linear_equations"],
                 },
             }
 
