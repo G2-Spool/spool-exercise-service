@@ -41,8 +41,8 @@ class ResponseEvaluator:
         use_enhanced_prompts: bool = True,
     ) -> Dict[str, Any]:
         """Evaluate a student's response with enhanced context and chain-of-thought prompting."""
-        # Validate response length
-        if len(student_response) < settings.MIN_RESPONSE_LENGTH:
+        # Validate response length (but be more lenient for potentially correct short answers)
+        if len(student_response) < 10:  # Very short responses (less than 10 chars) are likely insufficient
             return self._create_insufficient_response_evaluation(
                 exercise, student_response
             )
@@ -247,10 +247,12 @@ class ResponseEvaluator:
         - 10/10: Correct final answer + Clear reasoning + No major errors
         - 9/10: Correct final answer + Good reasoning + Minor presentation issues
         - 8/10: Correct final answer + Adequate reasoning + Small gaps
-        - 7/10: Mostly correct + Some errors + Basic understanding shown
-        - 6/10: Partially correct + Multiple errors + Limited understanding
-        - 5/10: Major errors + Confused reasoning + Minimal understanding
-        - 0-4/10: Incorrect answer + Major misunderstanding + No clear reasoning
+        - 7/10: Correct final answer + Minimal reasoning + Major gaps in explanation
+        - 6/10: Correct final answer ONLY (even if no explanation provided)
+        - 4-5/10: Partially correct + Some understanding shown
+        - 0-3/10: Incorrect answer OR major misunderstanding
+        
+        CRITICAL PRINCIPLE: Getting the right answer shows understanding - give credit accordingly
         
         CRITICAL: Focus on mathematical correctness and logical reasoning, NOT matching specific steps
 
@@ -327,10 +329,19 @@ class ResponseEvaluator:
         
         SCORING CRITERIA:
         - Give 10/10 if: Correct answer + Clear reasoning + No major errors
-        - Give 9/10 if: Correct answer + Good reasoning + Minor issues
+        - Give 9/10 if: Correct answer + Good reasoning + Minor issues  
         - Give 8/10 if: Correct answer + Adequate reasoning + Small gaps
-        - Give 6-7/10 if: Mostly correct + Some errors + Basic understanding
-        - Give 0-5/10 if: Wrong answer or major misunderstanding
+        - Give 7/10 if: Correct answer + Minimal reasoning + Major gaps
+        - Give 6/10 if: Correct answer ONLY (even without explanation)
+        - Give 4-5/10 if: Partially correct + Some understanding shown
+        - Give 0-3/10 if: Wrong answer OR no understanding shown
+        
+        IMPORTANT: A correct final answer deserves at least 6/10, even if brief
+        
+        EXAMPLES:
+        - "Average = 20" for a problem where 20 is correct → Give 6/10 minimum
+        - "Sum is 100, average is 20" → Give 7-8/10 
+        - Detailed correct work → Give 9-10/10
         
         CRITICAL: In your understanding_analysis, include "Understanding score: X/10"
         """
