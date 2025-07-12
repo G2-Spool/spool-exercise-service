@@ -72,3 +72,28 @@ dump.rdb
 tmp/
 temp/
 cache/
+
+# Build artifacts and distribution directories
+dist-*/
+layer*/
+app-code/
+simple-app/
+ultra-simple-app/
+*.zip
+
+# Temporary files with random names
+zi*
+
+# AI/ML database files
+.hive-mind/
+*.db
+*.db-shm
+*.db-wal
+memory.db
+
+# Simple/test Python files
+simple_*.py
+test_*.py
+ultra_simple_*.py
+minimal_handler.py
+final_test_*.txt

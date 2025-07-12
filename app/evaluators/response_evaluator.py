@@ -77,7 +77,7 @@ class ResponseEvaluator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.1,  # Very low temperature for consistent evaluation
+                temperature=0.0,  # Zero temperature for maximum consistency
                 response_format={"type": "json_object"},
             )
 
