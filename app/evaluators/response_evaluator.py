@@ -237,8 +237,9 @@ class ResponseEvaluator:
         - strength_identification: Concrete evidence of what student did well
         - next_steps: Clear guidance for continued learning
         
-        CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score.
-        CRITICAL: If the student understands the problem and solves it correctly, give them a score of 10/10.
+        CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score
+        CRITICAL: If the student understands the problem and solves it correctly, give them a score of 10/10
+        CRITICAL: If the student uses a hint, the most they can get is 9.5/10, and more hints used should lower the score
 
         ## THINKING PROCESS
         Before evaluating:

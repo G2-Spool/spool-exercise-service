@@ -14,7 +14,7 @@ from app.core.logging import setup_logging
 from app.core.dependencies import get_redis_cache
 from app.core.database import init_database, close_database, get_database_manager
 from app.langgraph.workflows import ExerciseWorkflow
-from app.routers import exercise, evaluation, remediation
+from app.routers import exercise, evaluation, remediation, hints
 
 # Setup structured logging
 setup_logging()
@@ -85,6 +85,7 @@ app.include_router(evaluation.router, prefix="/api/exercise", tags=["evaluation"
 app.include_router(
     remediation.router, prefix="/api/exercise/remediation", tags=["remediation"]
 )
+app.include_router(hints.router, prefix="/api/exercise", tags=["hints"])
 
 
 @app.get("/", tags=["root"])
