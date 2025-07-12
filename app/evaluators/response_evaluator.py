@@ -77,7 +77,7 @@ class ResponseEvaluator:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt},
                 ],
-                temperature=0.3,  # Lower temperature for more consistent evaluation
+                temperature=0.1,  # Very low temperature for consistent evaluation
                 response_format={"type": "json_object"},
             )
 
@@ -228,18 +228,31 @@ class ResponseEvaluator:
         4. Give feedback that doesn't include concrete improvement steps
         5. Evaluate based on exact wording rather than conceptual understanding
         6. Require the student to solve the problem multiple times to get full credit
+        7. Penalize students for using different valid approaches or step sequences
+        8. Give zero credit when students demonstrate understanding but use different methods
 
         ## STRUCTURED OUTPUT FORMAT
         Return JSON with:
-        - understanding_analysis: Detailed breakdown of demonstrated vs. missing understanding (include overall understanding score 0-10)
+        - understanding_analysis: Detailed breakdown of demonstrated vs. missing understanding (MUST include "Understanding score: X/10")
         - process_evaluation: Assessment of problem-solving approach and reasoning quality
         - growth_feedback: Specific, actionable suggestions for improvement
         - strength_identification: Concrete evidence of what student did well
         - next_steps: Clear guidance for continued learning
         
-        CRITICAL: In your understanding_analysis, explicitly state "Understanding score: X/10" where X is the numeric score
-        CRITICAL: If the student understands the problem and solves it correctly, give them a score of 10/10
-        CRITICAL: If the student uses a hint, the most they can get is 9.5/10, and more hints used should lower the score
+        CRITICAL OUTPUT FORMAT:
+        In your understanding_analysis field, you MUST include the exact phrase "Understanding score: X/10" where X is the numeric score
+        
+        DETERMINISTIC SCORING RULES:
+        Use ONLY these scores based on the criteria:
+        - 10/10: Correct final answer + Clear reasoning + No major errors
+        - 9/10: Correct final answer + Good reasoning + Minor presentation issues
+        - 8/10: Correct final answer + Adequate reasoning + Small gaps
+        - 7/10: Mostly correct + Some errors + Basic understanding shown
+        - 6/10: Partially correct + Multiple errors + Limited understanding
+        - 5/10: Major errors + Confused reasoning + Minimal understanding
+        - 0-4/10: Incorrect answer + Major misunderstanding + No clear reasoning
+        
+        CRITICAL: Focus on mathematical correctness and logical reasoning, NOT matching specific steps
 
         ## THINKING PROCESS
         Before evaluating:
@@ -271,9 +284,11 @@ class ResponseEvaluator:
         - Assess whether errors are conceptual or computational
         
         ### Step 4: Comprehensive Scoring
-        - Assign understanding score based on demonstrated mastery
-        - Consider multiple valid approaches and partial credit
-        - Ensure scoring reflects depth of understanding, not just correctness
+        - Assign understanding score based on demonstrated mastery and overall correctness
+        - Consider multiple valid approaches and give full credit for sound reasoning
+        - Ensure scoring reflects depth of understanding, not adherence to specific steps
+        - Focus on whether the student solved the problem correctly, not if they hit all
+            the expected steps
         
         ### Step 5: Feedback Generation
         - Provide specific, actionable feedback for improvement
@@ -301,16 +316,23 @@ class ResponseEvaluator:
         # Base prompt construction
         prompt = f"""Evaluate this student's response to an exercise:
         
-        Concept Being Tested: {concept.get('name')}
+        PROBLEM: {exercise.get('content', {}).get('problem')}
         
-        Exercise Scenario: {exercise.get('content', {}).get('scenario')}
-        Exercise Problem: {exercise.get('content', {}).get('problem')}
+        STUDENT RESPONSE: "{student_response}"
         
-        Expected Solution Steps:
-        {chr(10).join(f"{i+1}. {step}" for i, step in enumerate(expected_steps))}
+        EVALUATION FOCUS:
+        1. Is the final answer mathematically correct?
+        2. Does the student demonstrate valid reasoning?
+        3. Are there any major conceptual errors?
         
-        Student's Response:
-        "{student_response}"
+        SCORING CRITERIA:
+        - Give 10/10 if: Correct answer + Clear reasoning + No major errors
+        - Give 9/10 if: Correct answer + Good reasoning + Minor issues
+        - Give 8/10 if: Correct answer + Adequate reasoning + Small gaps
+        - Give 6-7/10 if: Mostly correct + Some errors + Basic understanding
+        - Give 0-5/10 if: Wrong answer or major misunderstanding
+        
+        CRITICAL: In your understanding_analysis, include "Understanding score: X/10"
         """
 
         # Add context for more accurate evaluation if available
@@ -334,19 +356,16 @@ class ResponseEvaluator:
         - Assess both conceptual understanding and procedural execution
         - Provide comprehensive scoring with detailed reasoning"""
 
-        prompt += f"""
+        if enhanced_criteria:
+            prompt += f"""
         
-        Evaluation Criteria:
-        1. Has the student demonstrated understanding of each expected step?
-        2. Is their reasoning logically sound?
-        3. Did they identify the key concepts?
-        4. Are there any misconceptions or knowledge gaps?
-        5. Is the explanation complete and clear?
-        {"6. Use the provided context to verify accuracy" if context_chunks else ""}
+        Enhanced Evaluation Criteria:
         {enhanced_criteria}
+        """
         
-        Score their overall understanding from 0.0 to 1.0.
-        Mastery is achieved ONLY if they explain ALL key steps correctly."""
+        prompt += """
+        
+        Remember: Focus on mathematical correctness and reasoning quality, not on matching specific solution steps or approaches."""
 
         return prompt
 
@@ -443,64 +462,45 @@ class ResponseEvaluator:
     def _extract_understanding_score(
         self, understanding_analysis: str, process_evaluation: str
     ) -> float:
-        """Extract understanding score from LLM analysis."""
+        """Extract understanding score from structured LLM response."""
         combined_text = f"{understanding_analysis} {process_evaluation}".lower()
-
-        # Look for explicit score mentions
+        
         import re
-
-        score_patterns = [
-            r"score[:\s]*(\d+(?:\.\d+)?)",
-            r"understanding[:\s]*(\d+(?:\.\d+)?)",
-            r"(\d+(?:\.\d+)?)[/\s]*(?:out of|/)?\s*(?:10|1\.0|1)",
-            r"(\d+(?:\.\d+)?)%",
-        ]
-
-        for pattern in score_patterns:
-            match = re.search(pattern, combined_text)
-            if match:
-                score = float(match.group(1))
-                # Normalize to 0-1 scale
-                if score > 1:
-                    if score <= 10:
-                        score = score / 10  # 9 -> 0.9 (out of 10)
-                    else:
-                        score = score / 100  # 90 -> 0.9 (out of 100)
-                return min(score, 1.0)
-
-        # Fallback: analyze quality indicators
-        positive_indicators = [
-            "correct",
-            "accurate",
-            "good",
-            "excellent",
-            "demonstrates",
-            "shows",
-            "understands",
-        ]
-        negative_indicators = [
-            "incorrect",
-            "wrong",
-            "missing",
-            "lacks",
-            "fails",
-            "confused",
-            "unclear",
-        ]
-
-        positive_count = sum(
-            1 for indicator in positive_indicators if indicator in combined_text
-        )
-        negative_count = sum(
-            1 for indicator in negative_indicators if indicator in combined_text
-        )
-
-        if positive_count > negative_count:
-            return 0.8 + (positive_count - negative_count) * 0.05
-        elif negative_count > positive_count:
-            return max(0.2, 0.7 - (negative_count - positive_count) * 0.1)
+        
+        # Look for the exact format: "understanding score: X/10"
+        score_pattern = r"understanding score:\s*(\d+(?:\.\d+)?)/10"
+        match = re.search(score_pattern, combined_text)
+        if match:
+            score = float(match.group(1))
+            return min(score / 10.0, 1.0)  # Normalize to 0-1 scale
+        
+        # Backup: look for any "X/10" pattern
+        general_pattern = r"(\d+(?:\.\d+)?)/10"
+        match = re.search(general_pattern, combined_text)
+        if match:
+            score = float(match.group(1))
+            return min(score / 10.0, 1.0)
+        
+        # Final fallback: analyze the structured responses
+        final_correct = "final answer correct: yes" in combined_text
+        reasoning_valid = "reasoning valid: yes" in combined_text
+        major_errors = "major errors: yes" in combined_text
+        
+        # Deterministic scoring based on structured analysis
+        if final_correct and reasoning_valid and not major_errors:
+            return 1.0  # 10/10
+        elif final_correct and reasoning_valid:
+            return 0.9  # 9/10
+        elif final_correct and not major_errors:
+            return 0.8  # 8/10
+        elif final_correct:
+            return 0.7  # 7/10
+        elif reasoning_valid and not major_errors:
+            return 0.6  # 6/10
+        elif not major_errors:
+            return 0.4  # 4/10
         else:
-            return 0.6
+            return 0.2  # 2/10
 
     def _extract_step_analysis(
         self,

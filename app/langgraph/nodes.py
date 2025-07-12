@@ -144,11 +144,17 @@ class WorkflowNodes:
             state["mastery_achieved"] = evaluation["mastery_achieved"]
             state["needs_remediation"] = evaluation["needs_remediation"]
 
-            if (
-                state["needs_remediation"]
-                and evaluation["competency_map"]["missing_steps"]
-            ):
-                state["target_gap"] = evaluation["competency_map"]["missing_steps"][0]
+            if state["needs_remediation"]:
+                # Set target_gap for remediation
+                if evaluation["competency_map"]["missing_steps"]:
+                    # Use the first missing step if available
+                    state["target_gap"] = evaluation["competency_map"]["missing_steps"][0]
+                elif evaluation["competency_map"]["incorrect_steps"]:
+                    # Use the first incorrect step if available
+                    state["target_gap"] = evaluation["competency_map"]["incorrect_steps"][0]
+                else:
+                    # Fallback to a general understanding gap
+                    state["target_gap"] = "Overall understanding of the concept needs improvement"
 
             state["workflow_status"] = "response_evaluated"
 
