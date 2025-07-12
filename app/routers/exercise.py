@@ -3,6 +3,7 @@
 import json
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Request
+
 import structlog
 
 from app.core.config import settings
@@ -20,6 +21,7 @@ from app.langgraph.workflows import ExerciseWorkflow
 
 router = APIRouter()
 logger = structlog.get_logger()
+
 
 
 @router.post("/generate", response_model=GenerateExerciseResponse)

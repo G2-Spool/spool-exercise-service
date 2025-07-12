@@ -95,10 +95,17 @@ class ExerciseGenerator:
                 raise ValueError("Empty response from OpenAI API")
             exercise_content = json.loads(content)
 
+            # Ensure concept_id is properly set
+            concept_id = concept.get("concept_id")
+            if not concept_id:
+                # Fallback to generate a default concept_id
+                concept_id = "default-concept"
+                logger.warning("Missing concept_id in concept data, using fallback", concept=concept)
+
             # Create exercise object
             exercise = {
                 "exercise_id": str(uuid.uuid4()),
-                "concept_id": concept.get("concept_id"),
+                "concept_id": concept_id,
                 "student_id": student_profile.get("student_id"),
                 "type": exercise_type,
                 "difficulty": difficulty,

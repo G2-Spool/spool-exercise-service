@@ -65,14 +65,16 @@ app = FastAPI(
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )
 
-# CORS middleware
+# CORS middleware - temporarily allow all origins for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for development
+    allow_credentials=False,  # Set to False when using allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+logger.info("CORS configured with origins", origins=settings.CORS_ORIGINS)
 
 # Setup Prometheus metrics (must be done before including routers)
 if settings.ENABLE_METRICS:
@@ -144,8 +146,8 @@ async def health_check(request: Request) -> JSONResponse:
     return JSONResponse(content=health_status, status_code=status_code)
 
 
-@app.get("/config", tags=["debug"])
-async def get_config() -> Dict[str, Any] | JSONResponse:
+@app.get("/config", tags=["debug"], response_model=None)
+async def get_config():
     """Get current configuration (development only)."""
     if settings.ENVIRONMENT == "production":
         return JSONResponse(

@@ -23,20 +23,36 @@ class WorkflowNodes:
     async def fetch_concept(self, state: ExerciseState) -> ExerciseState:
         """Fetch concept data from content service."""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{settings.CONTENT_SERVICE_URL}/api/content/concepts/{state['concept_id']}"
-                )
-                response.raise_for_status()
+            # For local development, use mock data when content service is unavailable
+            if settings.ENVIRONMENT == "development":
+                try:
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        response = await client.get(
+                            f"{settings.CONTENT_SERVICE_URL}/api/content/concepts/{state['concept_id']}"
+                        )
+                        response.raise_for_status()
+                        state["concept_data"] = response.json()
+                except Exception:
+                    # Fallback to mock data for development
+                    logger.info("Content service unavailable, using mock concept data")
+                    state["concept_data"] = self._create_mock_concept(state["concept_id"])
+            else:
+                # Production: require real content service
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        f"{settings.CONTENT_SERVICE_URL}/api/content/concepts/{state['concept_id']}"
+                    )
+                    response.raise_for_status()
+                    state["concept_data"] = response.json()
 
-                state["concept_data"] = response.json()
-                state["workflow_status"] = "concept_fetched"
+            state["workflow_status"] = "concept_fetched"
 
-                logger.info(
-                    "Fetched concept data",
-                    concept_id=state["concept_id"],
-                    concept_name=state["concept_data"].get("name"),
-                )
+            logger.info(
+                "Fetched concept data",
+                concept_id=state["concept_id"],
+                concept_name=state["concept_data"].get("name"),
+                is_mock=settings.ENVIRONMENT == "development" and "mock" in state["concept_data"].get("source", ""),
+            )
 
         except Exception as e:
             logger.error("Failed to fetch concept", error=str(e))
@@ -44,6 +60,32 @@ class WorkflowNodes:
             state["workflow_status"] = "error"
 
         return state
+
+    def _create_mock_concept(self, concept_id: str) -> dict:
+        """Create mock concept data for development."""
+        return {
+            "concept_id": concept_id,
+            "name": "Mathematical Problem Solving",
+            "description": "Learn systematic approaches to solving mathematical problems, including breaking down complex problems into manageable steps.",
+            "subject": "Mathematics",
+            "difficulty": "intermediate",
+            "learning_objectives": [
+                "Break down complex problems into smaller, manageable parts",
+                "Apply systematic problem-solving strategies",
+                "Verify solutions for accuracy and reasonableness",
+                "Communicate mathematical reasoning clearly"
+            ],
+            "prerequisite_concepts": ["basic_algebra", "mathematical_reasoning"],
+            "key_terms": ["problem decomposition", "systematic approach", "verification", "mathematical reasoning"],
+            "examples": [
+                "Word problems involving multiple steps",
+                "Optimization problems",
+                "Logic puzzles"
+            ],
+            "source": "mock_data_for_development",
+            "created_at": "2025-01-01T00:00:00Z",
+            "updated_at": "2025-01-01T00:00:00Z"
+        }
 
     async def fetch_student_profile(self, state: ExerciseState) -> ExerciseState:
         """Fetch student profile (mock for now)."""
@@ -160,11 +202,20 @@ class WorkflowNodes:
             state["workflow_status"] = "error"
             return state
 
-        # Check required fields
-        required_fields = ["scenario", "problem", "expected_steps", "hints"]
-        missing_fields = [
-            f for f in required_fields if f not in exercise.get("content", {})
+        # Check required fields in content
+        content_fields = ["scenario", "problem"]
+        content = exercise.get("content", {})
+        missing_content_fields = [
+            f for f in content_fields if f not in content
         ]
+
+        # Check required fields at exercise level
+        exercise_fields = ["expected_steps", "hints"]
+        missing_exercise_fields = [
+            f for f in exercise_fields if f not in exercise
+        ]
+
+        missing_fields = missing_content_fields + missing_exercise_fields
 
         if missing_fields:
             state["error"] = f"Missing required fields: {missing_fields}"
