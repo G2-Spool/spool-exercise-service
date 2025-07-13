@@ -6,9 +6,21 @@ import structlog
 from app.models.chat import ChatRequest, ChatResponse
 from app.agents.chat_agent import ChatAgent
 from app.core.session import SessionManager
+from app.resources.personalities.personality_loader import personality_loader
 
 router = APIRouter()
 logger = structlog.get_logger()
+
+
+@router.get("/personalities")
+async def get_personalities():
+    """Get list of available personalities."""
+    try:
+        personalities = personality_loader.list_available_personalities()
+        return {"personalities": personalities}
+    except Exception as e:
+        logger.error("Failed to get personalities", error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve personalities")
 
 
 @router.post("/chat", response_model=ChatResponse)

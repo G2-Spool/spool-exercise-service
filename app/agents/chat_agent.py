@@ -116,11 +116,129 @@ class ChatAgent:
 
     async def _handle_general_chat(self, message: str, session_state: Dict[str, Any]) -> Dict[str, Any]:
         """Handles conversational turns that are not specific actions."""
+        exercise = session_state.get("current_exercise")
+        if not exercise:
+            return self._create_error_response("No active exercise found in session.", session_state)
+        
+        # Determine if this is a question or a step submission
+        is_question = await self._is_question(message)
+        
+        if is_question:
+            # Handle as a question - provide scaffolded help
+            return await self._handle_question(message, session_state)
+        else:
+            # Handle as a step submission - evaluate the work
+            return await self._handle_step_submission(message, session_state)
+
+    async def _is_question(self, message: str) -> bool:
+        """Determines if the message is a question or a step submission."""
+        # Simple heuristics for question detection
+        message_lower = message.lower().strip()
+        
+        # Obvious question indicators
+        if message_lower.endswith('?'):
+            return True
+        
+        # Question words
+        question_words = ['what', 'how', 'why', 'where', 'when', 'which', 'who', 'can', 'could', 'should', 'would', 'is', 'are', 'do', 'does', 'did']
+        if any(message_lower.startswith(word + ' ') for word in question_words):
+            return True
+        
+        # If it contains mathematical work (equations, numbers, steps), likely not a question
+        if any(char in message for char in ['=', '+', '-', '*', '/', '(', ')']):
+            return False
+        
+        # Use LLM as final arbiter for ambiguous cases
+        prompt = f"""
+        Determine if the following student message is a QUESTION asking for help, or a STEP/WORK submission showing their mathematical work:
+        
+        Student message: "{message}"
+        
+        Respond with only "QUESTION" or "STEP" - nothing else.
+        """
+        
+        response = await self.client.chat.completions.create(
+            model=settings.GENERATION_MODEL,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        content = response.choices[0].message.content
+        return "QUESTION" in (content.upper() if content else "")
+
+    async def _handle_question(self, message: str, session_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Handles when student asks a question - provides scaffolded help."""
+        exercise = session_state.get("current_exercise")
+        if not exercise:
+            return self._create_error_response("No active exercise found in session.", session_state)
+            
+        personality_prompt = personality_loader.get_personality_prompt(session_state.get("personality_type"))
+        
+        prompt = f"""
+        You are an AI tutor with the following personality: {personality_prompt}
+        
+        Current Exercise Context:
+        - Scenario: {exercise.get('scenario', 'N/A')}
+        - Problem: {exercise.get('problem', 'N/A')}
+        - Expected Solution: {exercise.get('expected_solution', 'N/A')}
+        - Hints: {exercise.get('hints', [])}
+        
+        Student Question: "{message}"
+        
+        Your task:
+        1. Answer the student's question by providing scaffolded help related to the current exercise.
+        2. Don't give away the complete solution - guide them to discover it themselves.
+        3. Use the exercise context to provide relevant, specific help.
+        4. Be encouraging and match your personality.
+        5. Do NOT invent a name or any details for the student.
+        6. **Crucially, any mathematical equations, variables, or expressions in your response MUST be enclosed in double dollar signs for LaTeX rendering. Example: $$2x + 3y = 7$$**
+        """
+        
+        response = await self.client.chat.completions.create(
+            model=settings.GENERATION_MODEL,
+            messages=[{"role": "system", "content": "You are a conversational AI Tutor."}, {"role": "user", "content": prompt}]
+        )
+        
         return {
-            "message": "That's a great question! Let's explore that. (general chat not fully implemented yet)",
+            "message": response.choices[0].message.content or "I'm here to help with your question!",
             "session_state": session_state,
-            "available_actions": session_state.get("available_actions", []),
-            "data": {},
+            "available_actions": ["submit_answer", "get_hint", "ask_question"],
+            "data": {"response_type": "question_help"},
+        }
+
+    async def _handle_step_submission(self, message: str, session_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Handles when student submits work/steps - provides acknowledgment WITHOUT evaluation."""
+        exercise = session_state.get("current_exercise")
+        if not exercise:
+            return self._create_error_response("No active exercise found in session.", session_state)
+            
+        # For step submissions, just acknowledge receipt without evaluation
+        personality_prompt = personality_loader.get_personality_prompt(session_state.get("personality_type"))
+        
+        prompt = f"""
+        You are an AI tutor with the following personality: {personality_prompt}
+        
+        The student submitted some work/steps: "{message}"
+        
+        Your task:
+        1. Briefly acknowledge their step submission in an encouraging way.
+        2. Do NOT evaluate or judge their work - just acknowledge it.
+        3. Encourage them to continue working or ask questions if needed.
+        4. Keep it brief and supportive.
+        5. Match your personality.
+        6. Do NOT invent a name or any details for the student.
+        7. **Crucially, any mathematical equations, variables, or expressions in your response MUST be enclosed in double dollar signs for LaTeX rendering. Example: $$x = 5$$**
+        """
+        
+        response = await self.client.chat.completions.create(
+            model=settings.GENERATION_MODEL,
+            messages=[{"role": "system", "content": "You are a conversational AI Tutor."}, {"role": "user", "content": prompt}]
+        )
+        
+        return {
+            "message": response.choices[0].message.content or "Thanks for sharing your work! Keep going.",
+            "session_state": session_state,
+            "available_actions": ["submit_answer", "get_hint", "ask_question"],
+            "data": {"response_type": "step_acknowledgment"},
         }
 
     async def _craft_intro_message(self, exercise_data: Dict[str, Any], session_state: Dict[str, Any]) -> str:

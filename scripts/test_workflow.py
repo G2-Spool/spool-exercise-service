@@ -1,42 +1,47 @@
 #!/usr/bin/env python3
 """
-Comprehensive Exercise Workflow Test with Pinecone Integration
+Comprehensive Exercise Workflow Test with ChatAgent Integration
 
-This script tests the complete exercise workflow with Pinecone vector search:
-1. Generate personalized exercises for students with specific interests (using vector context)
-2. Use hardcoded student responses (4 types) for consistent testing
-3. Evaluate responses using the evaluator (with educational context)
-4. Generate remediation if needed (with example content)
-5. Log all interactions including Pinecone usage
+This script tests the complete exercise workflow through the ChatAgent endpoint:
+1. Generate personalized exercises for students with specific interests
+2. Use hardcoded student responses for consistent testing
+3. Evaluate responses through the chat interface
+4. Request remediation if needed
+5. Log all interactions and generate detailed reports
 
 Results are saved to detailed files for analysis.
 """
+
+import sys
+from pathlib import Path
+
+# Add app directory to path before any app imports
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 import asyncio
 import json
 import os
 from datetime import datetime
-from typing import Dict, Any
-import sys
+from typing import Dict, Any, Optional
 import logging
-from pathlib import Path
 import argparse
-import subprocess
-import time
-import signal
+import uuid
 import httpx
+import time
+import subprocess
+import signal
 
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except ImportError:
-    print(
-        "⚠️  python-dotenv not installed. Make sure OPENAI_API_KEY is set in environment."
-    )
+    print("⚠️  python-dotenv not installed. Make sure OPENAI_API_KEY is set in environment.")
 
-# Set up Pinecone environment variables for testing
+from app.models.chat import ChatRequest, ChatResponse
+
+# Set default test environment variables
 os.environ.setdefault("ENABLE_VECTOR_CONTEXT", "true")
 os.environ.setdefault("PINECONE_API_KEY", "test-pinecone-key")
 os.environ.setdefault("PINECONE_INDEX_NAME", "spool-content")
@@ -44,28 +49,13 @@ os.environ.setdefault("PINECONE_ENVIRONMENT", "us-east-1-aws")
 os.environ.setdefault("CONTENT_SERVICE_SEARCH_URL", "http://localhost:8002/api/content/search")
 os.environ.setdefault("MIN_RESPONSE_LENGTH", "20")
 
-# Add app directory to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-# ruff: noqa: E402# Import the exercise service components
+# ruff: noqa: E402
+# Import the exercise service components
 from app.models.exercise import (
     LifeCategory,
     DifficultyLevel,
     ExerciseType,
 )
-
-try:
-    from app.langgraph.workflows import ExerciseWorkflow
-    WORKFLOW_AVAILABLE = True
-    print("✅ LangGraph workflow loaded successfully")
-except ImportError as e:
-    print(f"⚠️ LangGraph workflow not available: {str(e)}")
-    WORKFLOW_AVAILABLE = False
-
-from app.tools.exercise_tool import ExerciseTool
-from app.tools.evaluation_tool import EvaluationTool
-from app.tools.remediation_tool import RemediationTool
 
 # Setup basic logging
 
@@ -74,19 +64,18 @@ logger = logging.getLogger(__name__)
 
 
 class ExerciseWorkflowTester:
-    """Comprehensive workflow tester with Pinecone integration testing."""
+    """Comprehensive workflow tester using ChatAgent endpoint."""
 
-    def __init__(self, use_hardcoded_exercise: bool = False):
+    def __init__(self, base_url: str = "http://localhost:8000"):
         # Verify API key is available
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key or api_key.startswith("test"):
-            raise ValueError(
-                "Valid OpenAI API key required. Set OPENAI_API_KEY in .env file"
-            )
+            raise ValueError("Valid OpenAI API key required. Set OPENAI_API_KEY in .env file")
 
+        self.base_url = base_url.rstrip('/')
+        self.chat_endpoint = f"{self.base_url}/api/chat"  # Add /api prefix for FastAPI endpoints
         self.test_results = []
         self.output_dir = "test_results"
-        self.pinecone_usage_log = []
         self.mock_service_process = None
 
         # Create output directory
@@ -94,57 +83,6 @@ class ExerciseWorkflowTester:
         
         # Initialize mock content service
         self._setup_mock_content_service()
-        
-        # Initialize components after mock service is ready
-        self.generator = ExerciseTool()
-        self.evaluator = EvaluationTool()
-        self.remediation_gen = RemediationTool()
-        if WORKFLOW_AVAILABLE:
-            self.workflow = ExerciseWorkflow()
-        else:
-            self.workflow = None
-            print(
-                "⚠️  LangGraph workflow not available - using direct component testing"
-            )
-        
-        # Check Pinecone configuration
-        self._check_pinecone_config()
-
-        # Student scenarios with different interests
-        self.student_scenarios = [
-            {
-                "name": "Perfect Student",
-                "description": "Student who succeeds flawlessly",
-                "student_id": "perfect_student_001",
-                "interests": ["sports", "music", "technology"],
-                "grade_level": "high school",
-                "response_type": "perfect",
-            },
-            {
-                "name": "Good Student",
-                "description": "Student with good understanding but makes mistakes",
-                "student_id": "good_student_002",
-                "interests": ["art", "science", "gaming"],
-                "grade_level": "high school",
-                "response_type": "good_with_mistakes",
-            },
-            {
-                "name": "Struggling Student",
-                "description": "Student who struggles but is trying",
-                "student_id": "struggling_student_003",
-                "interests": ["animals", "cooking", "social media"],
-                "grade_level": "middle school",
-                "response_type": "struggling",
-            },
-            {
-                "name": "Lazy Student",
-                "description": "Student who doesn't try and just wants answers",
-                "student_id": "lazy_student_004",
-                "interests": ["gaming", "movies", "social media"],
-                "grade_level": "high school",
-                "response_type": "lazy",
-            },
-        ]
 
         # Test concept for consistent testing
         self.test_concept = {
@@ -161,97 +99,107 @@ class ExerciseWorkflowTester:
             ],
         }
 
-        # Personalities to test
-        self.personalities = [
-            "default",
-            "analytical-detective",
-            "empathetic-supporter",
-            "enthusiastic-coach",
-            "wise-mentor",
-            "collaborative-facilitator",
-            "creative-innovator",
-            "practical-guide",
-            "scientific-explorer",
-            "storytelling-historian",
-            "strategic-challenger",
+        # Student scenarios with different interests
+        self.student_scenarios = [
+            {
+                "name": "Perfect Student",
+                "description": "Student who succeeds flawlessly",
+                "student_id": "perfect_student_001",
+                "interests": ["sports", "music", "technology"],
+                "grade_level": "high school",
+                "response_type": "perfect",
+                "personality_type": "enthusiastic-coach"
+            },
+            {
+                "name": "Good Student",
+                "description": "Student with good understanding but makes mistakes",
+                "student_id": "good_student_002",
+                "interests": ["art", "science", "gaming"],
+                "grade_level": "high school",
+                "response_type": "good_with_mistakes",
+                "personality_type": "empathetic-supporter"
+            },
+            {
+                "name": "Struggling Student",
+                "description": "Student who struggles but is trying",
+                "student_id": "struggling_student_003",
+                "interests": ["animals", "cooking", "social media"],
+                "grade_level": "middle school",
+                "response_type": "struggling",
+                "personality_type": "wise-mentor"
+            },
+            {
+                "name": "Lazy Student",
+                "description": "Student who doesn't try and just wants answers",
+                "student_id": "lazy_student_004",
+                "interests": ["gaming", "movies", "social media"],
+                "grade_level": "high school",
+                "response_type": "lazy",
+                "personality_type": "strategic-challenger"
+            },
         ]
 
-        self.use_hardcoded_exercise = use_hardcoded_exercise
+        # Update student profiles with consistent session IDs
+        for scenario in self.student_scenarios:
+            scenario["session_id"] = str(uuid.uuid4())
 
-        # Hardcoded exercise for consistent evaluator testing
-        self.hardcoded_exercise = {
-            "exercise_id": "hardcoded_test_001",
-            "concept_id": "quadratic_equations_001",
-            "student_id": "test_student",
-            "type": "initial",
-            "difficulty": "basic",
-            "content": {
-                "scenario": "You're at a basketball court in your school's new gym. The path of the basketball when you're making a free throw can be modeled by a quadratic equation.",
-                "problem": "The basketball's path is represented by the equation x² + 5x + 6 = 0. Find the solutions to this equation and explain what each step of your solution process accomplishes.",
-                "expected_steps": [
-                    "Identify this as a quadratic equation in standard form",
-                    "Choose an appropriate solution method (factoring, completing the square, or quadratic formula)",
-                    "Apply the chosen method systematically",
-                    "Solve for both values of x",
-                    "Verify solutions by substituting back into the original equation",
-                    "Interpret the solutions in context",
-                ],
-                "hints": [
-                    "Look for two numbers that multiply to 6 and add to 5",
-                    "Remember that quadratic equations typically have two solutions",
-                    "Always check your work by substituting back",
-                ],
-                "success_criteria": "Student correctly identifies solution method, executes it properly, finds both solutions (-2 and -3), and verifies results",
-            },
-            "personalization": {
-                "interests_used": ["sports"],
-                "life_category": "academic",
-                "context": "Basketball court design scenario",
-            },
-            "expected_steps": [
-                "Identify this as a quadratic equation in standard form",
-                "Choose an appropriate solution method (factoring, completing the square, or quadratic formula)",
-                "Apply the chosen method systematically",
-                "Solve for both values of x",
-                "Verify solutions by substituting back into the original equation",
-                "Interpret the solutions in context",
-            ],
-            "hints": [
-                "Look for two numbers that multiply to 6 and add to 5",
-                "Remember that quadratic equations typically have two solutions",
-                "Always check your work by substituting back",
-            ],
-            "created_at": datetime.utcnow().isoformat(),
-        }
+    async def send_chat_request(
+        self, 
+        session_id: str, 
+        message: str = "", 
+        action: Optional[str] = None,
+        student_profile: Optional[Dict[str, Any]] = None,
+        timeout: float = 30.0
+    ) -> ChatResponse:
+        """Send a chat request to the ChatAgent endpoint with retries for transient errors."""
+        request = ChatRequest(
+            session_id=session_id,
+            message=message,
+            action=action,
+            student_profile=student_profile or {}
+        )
 
-    def _check_pinecone_config(self):
-        """Check and log Pinecone configuration."""
-        enable_vector = os.getenv("ENABLE_VECTOR_CONTEXT", "false").lower() == "true"
-        pinecone_key = os.getenv("PINECONE_API_KEY", "")
-        content_service_url = os.getenv("CONTENT_SERVICE_SEARCH_URL", "")
-        
-        print(f"\n🔍 Pinecone Configuration Check:")
-        print(f"   ENABLE_VECTOR_CONTEXT: {enable_vector}")
-        print(f"   PINECONE_API_KEY: {'✅ SET' if pinecone_key else '❌ NOT SET'}")
-        print(f"   CONTENT_SERVICE_SEARCH_URL: {content_service_url}")
-        
-        if enable_vector and pinecone_key:
-            print("   🚀 Pinecone integration ENABLED - Vector search will be used")
-        else:
-            print("   ⚠️  Pinecone integration DISABLED - Using standard prompts only")
-        
-        # Test individual service configurations
-        print(f"\n📊 Service Configuration:")
-        print(f"   Generator Pinecone Service: {hasattr(self.generator, 'pinecone_service')}")
-        print(f"   Evaluator Pinecone Service: {hasattr(self.evaluator, 'pinecone_service')}")
-        print(f"   Remediation Pinecone Service: {hasattr(self.remediation_gen, 'pinecone_service')}")
-        
-        if hasattr(self.generator, 'pinecone_service'):
-            enabled = getattr(self.generator.pinecone_service, 'enabled', False)
-            print(f"   Generator Pinecone Enabled: {enabled}")
-        
-        print("=" * 60)
+        last_error = None
+        max_retries = 3
+        backoff_factor = 1.5
 
+        for attempt in range(max_retries):
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        self.chat_endpoint,
+                        json=request.model_dump(),  # Use model_dump() instead of dict() for Pydantic v2
+                        timeout=timeout * (backoff_factor ** attempt)  # Increase timeout with each retry
+                    )
+                    response.raise_for_status()
+                    return ChatResponse(**response.json())
+            
+            except httpx.ReadTimeout as e:
+                last_error = f"Request timed out after {timeout * (backoff_factor ** attempt):.1f}s"
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(attempt * backoff_factor)  # Exponential backoff
+                    continue
+                raise Exception(f"Chat request failed after {max_retries} attempts: {last_error}") from e
+            
+            except httpx.HTTPStatusError as e:
+                status_code = e.response.status_code if e.response else "unknown"
+                last_error = f"HTTP error {status_code}"
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(attempt * backoff_factor)
+                    continue
+                raise Exception(f"Chat request failed after {max_retries} attempts: {last_error}") from e
+            
+            except Exception as e:
+                last_error = str(e)
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(attempt * backoff_factor)
+                    continue
+                raise Exception(f"Chat request failed after {max_retries} attempts: {last_error}") from e
+        
+        # If we get here without returning, all retries failed
+        raise Exception(f"Chat request failed after {max_retries} attempts: {last_error}")
+
+    # Setup mock content service
     def _setup_mock_content_service(self):
         """Start the mock content service for testing."""
         print("\n🚀 Starting Mock Content Service for Pinecone Integration Testing...")
@@ -326,103 +274,62 @@ class ExerciseWorkflowTester:
         """Ensure cleanup on object destruction."""
         self._cleanup_mock_service()
 
-    def _log_pinecone_usage(self, component: str, operation: str, used: bool, details: str = ""):
-        """Log Pinecone usage for analysis."""
-        log_entry = {
-            "component": component,
-            "operation": operation,
-            "pinecone_used": used,
-            "details": details,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        self.pinecone_usage_log.append(log_entry)
-        
-        status = "🚀 USED" if used else "⚠️  FALLBACK"
-        print(f"   {status} {component} - {operation}: {details}")
-
     async def run_comprehensive_test(self, quick_mode: bool = False):
-        """Run comprehensive test with correct flow."""
-        print("🚀 Starting Comprehensive Exercise Workflow Test with Pinecone")
+        """Run comprehensive test using the ChatAgent endpoint with parallel execution."""
+        print("🚀 Starting Comprehensive Exercise Workflow Test")
         print("=" * 60)
+
         if quick_mode:
-            print("🔬 QUICK MODE: Testing default personality only")
-            test_personalities = ["default"]
+            print("🔬 QUICK MODE: Testing one student")
             test_scenarios = [self.student_scenarios[0]]  # Just perfect student
         else:
-            print("🔄 FULL MODE: Testing all personalities and scenarios")
-            test_personalities = self.personalities
+            print("🔄 FULL MODE: Testing all scenarios in parallel")
             test_scenarios = self.student_scenarios
 
-        if self.use_hardcoded_exercise:
-            print("📝 Using HARDCODED exercise for consistent evaluator testing")
-        else:
-            print("🎯 Generating personalized exercises for each student")
-
-        print("Following the ENHANCED flow with Pinecone Vector Search:")
-        print("1. Generate personalized exercises (with vector context)")
-        print("2. Use hardcoded student responses for consistency")
-        print("3. Evaluate responses (with educational context)")
-        print("4. Generate remediation (with example content)")
-        print("5. Log all interactions including Pinecone usage")
+        print("\nFollowing the ChatAgent workflow:")
+        print("1. Generate personalized exercises")
+        print("2. Submit hardcoded student responses")
+        print("3. Evaluate responses through chat")
+        print("4. Request remediation if needed")
+        print("5. Log all interactions")
         print("=" * 60)
 
         start_time = datetime.utcnow()
 
-        # Test each personality with each student scenario
-        for personality in test_personalities:
-            print(f"\n{'='*80}")
-            print(f"🎭 Testing Personality: {personality}")
-            print(f"{'='*80}")
+        # Run all scenario tests in parallel
+        tasks = [self._run_single_test(scenario) for scenario in test_scenarios]
+        results = await asyncio.gather(*tasks)
 
-            for scenario in test_scenarios:
-                print(f"\n{'-'*60}")
-                print(f"🎯 Testing: {scenario['name']} with {personality} personality")
-                print(f"📝 Description: {scenario['description']}")
-                print(f"👤 Student ID: {scenario['student_id']}")
-                print(f"🎨 Interests: {', '.join(scenario['interests'])}")
-                print(f"🎭 Personality: {personality}")
-                print(f"{'-'*60}")
+        # Process results
+        for scenario, result in zip(test_scenarios, results):
+            try:
+                self.test_results.append({
+                    "scenario": scenario,
+                    "result": result,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "success": True
+                })
+                print(f"✅ {scenario['name']} completed successfully")
 
-                try:
-                    result = await self._run_single_test(scenario, personality)
-                    self.test_results.append(
-                        {
-                            "scenario": scenario,
-                            "personality": personality,
-                            "result": result,
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "success": True,
-                        }
-                    )
-                    print(
-                        f"✅ {scenario['name']} with {personality} completed successfully"
-                    )
-
-                except Exception as e:
-                    error_result = {
-                        "error": str(e),
-                        "scenario_name": scenario["name"],
-                        "personality": personality,
-                        "timestamp": datetime.utcnow().isoformat(),
+            except Exception as e:
+                error_result = {
+                    "error": str(e),
+                    "scenario_name": scenario["name"],
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+                self.test_results.append({
+                    "scenario": scenario,
+                    "result": error_result,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "success": False
+                })
+                print(f"❌ {scenario['name']} failed: {str(e)}")
+                logger.error("Scenario failed", 
+                    extra={
+                        "scenario": scenario["name"],
+                        "error": str(e)
                     }
-                    self.test_results.append(
-                        {
-                            "scenario": scenario,
-                            "personality": personality,
-                            "result": error_result,
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "success": False,
-                        }
-                    )
-                    print(f"❌ {scenario['name']} with {personality} failed: {str(e)}")
-                    logger.error(
-                        "Scenario failed",
-                        extra={
-                            "scenario": scenario["name"],
-                            "personality": personality,
-                            "error": str(e),
-                        },
-                    )
+                )
 
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()
@@ -432,233 +339,99 @@ class ExerciseWorkflowTester:
         print(f"❌ Failed: {sum(1 for r in self.test_results if not r['success'])}")
 
         await self._save_comprehensive_results()
-
+        
         print(f"\n📁 Results saved to '{self.output_dir}' directory")
-        print(
-            "📊 Check workflow_test_results_YYYYMMDD_HHMMSS.json for detailed JSON data"
-        )
-        print(
-            "📖 Check workflow_test_report_YYYYMMDD_HHMMSS.md for comprehensive analysis report"
-        )
+        print("📊 Check workflow_test_results_YYYYMMDD_HHMMSS.json for detailed data")
+        print("📖 Check workflow_test_report_YYYYMMDD_HHMMSS.md for analysis report")
         
         # Clean up mock service
         self._cleanup_mock_service()
 
-    async def _run_single_test(
-        self, scenario: Dict[str, Any], personality: str = "default"
-    ) -> Dict[str, Any]:
-        """Run a single test following the correct flow."""
-
+    async def _run_single_test(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
+        """Run a single test through the ChatAgent workflow with retries."""
+        session_id = scenario["session_id"]
         student_profile = {
             "student_id": scenario["student_id"],
             "interests": scenario["interests"],
             "grade_level": scenario["grade_level"],
+            "personality_type": scenario["personality_type"]
         }
 
-        if self.use_hardcoded_exercise:
-            # Step 1: Use hardcoded exercise for consistent evaluator testing
-            print("\n1️⃣ Using hardcoded exercise for consistent evaluator testing...")
+        print(f"\n🎯 Testing {scenario['name']}...")
+        
+        # Step 1: Generate exercise with retry
+        exercise_data = None
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                print(f"   1️⃣ Generating personalized exercise (attempt {attempt + 1})...")
+                exercise_response = await self.send_chat_request(
+                    session_id=session_id,
+                    action="generate_exercise",
+                    student_profile=student_profile
+                )
+                exercise_data = exercise_response.data
+                if not exercise_data:
+                    raise ValueError("No exercise data received from server")
+                print(f"      ✅ Exercise generated")
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"      ⚠️ Attempt {attempt + 1} failed, retrying...")
+                await asyncio.sleep(1)  # Brief delay before retry
+        
+        if not exercise_data:
+            raise Exception("Failed to generate exercise after all retries")
 
-            generated_exercise = self.hardcoded_exercise.copy()
-            generated_exercise["student_id"] = scenario["student_id"]
-            generated_exercise["personalization"]["interests_used"] = scenario[
-                "interests"
-            ]
+        # Step 2: Submit hardcoded response
+        print(f"   2️⃣ Submitting {scenario['response_type']} response...")
+        hardcoded_response = self._generate_hardcoded_response(
+            exercise_data.get("exercise", {}),
+            scenario["response_type"]
+        )
+        
+        evaluation_response = await self.send_chat_request(
+            session_id=session_id,
+            message=hardcoded_response,
+            action="submit_answer"
+        )
+        
+        evaluation_data = evaluation_response.data
+        print(f"      ✅ Response evaluated")
 
-            print(f"   ✅ Exercise loaded: {generated_exercise['exercise_id']}")
-            print(
-                f"   🎯 Interests applied: {', '.join(generated_exercise['personalization']['interests_used'])}"
+        # Step 3: Request remediation if needed
+        remediation_data = None
+        if "request_remediation" in evaluation_response.available_actions:
+            print("   3️⃣ Requesting remediation...")
+            remediation_response = await self.send_chat_request(
+                session_id=session_id,
+                action="request_remediation"
             )
-            print(
-                f"   📝 Scenario: {generated_exercise['content']['scenario'][:100]}..."
-            )
-
-            # Step 2: Log the hardcoded exercise
-            exercise_log = {
-                "step": "exercise_hardcoded",
-                "exercise_id": generated_exercise["exercise_id"],
-                "student_profile": student_profile,
-                "hardcoded_content": generated_exercise,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        else:
-            # Step 1: Generate personalized exercise for this student
-            print(f"\n1️⃣ Generating personalized exercise for {scenario['name']}...")
-
-            # Check if Pinecone will be used in generation
-            generator_pinecone_enabled = getattr(self.generator.pinecone_service, 'enabled', False)
             
-            generated_exercise = await self.generator.generate(
-                concept=self.test_concept,
-                student_profile=student_profile,
-                life_category=LifeCategory.PERSONAL.value,
-                difficulty=DifficultyLevel.BASIC.value,
-                exercise_type=ExerciseType.INITIAL.value,
-                personality=personality,
-            )
-
-            # Log Pinecone usage for exercise generation
-            self._log_pinecone_usage(
-                "ExerciseTool", 
-                "get_concept_context", 
-                generator_pinecone_enabled,
-                f"Concept: {self.test_concept['name']}, Interests: {', '.join(student_profile['interests'])}"
-            )
-
-            print(f"   ✅ Exercise generated: {generated_exercise['exercise_id']}")
-            print(
-                f"   🎯 Interests incorporated: {', '.join(generated_exercise['personalization']['interests_used'])}"
-            )
-            print(
-                f"   📝 Scenario: {generated_exercise['content']['scenario'][:100]}..."
-            )
-
-            # Step 2: Log the generated exercise
-            exercise_log = {
-                "step": "exercise_generation",
-                "exercise_id": generated_exercise["exercise_id"],
-                "student_profile": student_profile,
-                "generation_params": {
-                    "life_category": LifeCategory.PERSONAL.value,
-                    "difficulty": DifficultyLevel.BASIC.value,
-                    "exercise_type": ExerciseType.INITIAL.value,
-                    "personality": personality,
-                },
-                "generated_content": generated_exercise,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-
-        # Step 3: Generate hardcoded student response for this exercise
-        print(
-            f"\n2️⃣ Generating hardcoded student response ({scenario['response_type']})..."
-        )
-
-        student_response = self._generate_hardcoded_response(
-            generated_exercise, scenario["response_type"]
-        )
-
-        print(f"   📝 Response type: {scenario['response_type']}")
-        print(f"   📏 Response length: {len(student_response)} characters")
-        print(f"   🗣️ Response preview: {student_response[:150]}...")
-
-        # Step 4: Evaluate the student response
-        print("\n3️⃣ Evaluating student response...")
-        print("   🔧 Using HARDCODED exercise for consistent evaluator testing")
-
-        # Check if Pinecone will be used in evaluation
-        evaluator_pinecone_enabled = getattr(self.evaluator.pinecone_service, 'enabled', False)
-
-        evaluation = await self.evaluator.evaluate(
-            self.hardcoded_exercise, student_response, self.test_concept
-        )
-
-        # Log Pinecone usage for evaluation
-        self._log_pinecone_usage(
-            "EvaluationTool", 
-            "get_concept_context", 
-            evaluator_pinecone_enabled,
-            f"Concept: {self.test_concept['name']}, Response length: {len(student_response)}"
-        )
-
-        print(f"   ✅ Evaluation complete: {evaluation['evaluation_id']}")
-        print(
-            f"   📊 Understanding score: {evaluation['understanding_score']:.1%} ({evaluation['understanding_score']:.2f}/1.0)"
-        )
-        print(f"   🎯 Mastery achieved: {evaluation['mastery_achieved']}")
-        print(f"   🔄 Needs remediation: {evaluation['needs_remediation']}")
-
-        # Step 5: Log the evaluation response
-        evaluation_log = {
-            "step": "evaluation",
-            "evaluation_id": evaluation["evaluation_id"],
-            "student_response": student_response,
-            "evaluation_result": evaluation,
-            "llm_response": evaluation.get("llm_response"),
-            "llm_response_raw": evaluation.get("llm_response_raw"),
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-
-        # Step 6: Generate remediation if needed
-        remediation = None
-        remediation_log = None
-
-        if evaluation["needs_remediation"]:
-            print(f"\n4️⃣ Generating remediation (personality: {personality})...")
-
-            # Check if Pinecone will be used in remediation
-            remediation_pinecone_enabled = getattr(self.remediation_gen.pinecone_service, 'enabled', False)
-
-            remediation = await self.remediation_gen.generate(
-                self.test_concept,
-                "comprehensive understanding",
-                student_profile,
-                self.hardcoded_exercise,
-                evaluation,
-            )
-
-            # Log Pinecone usage for remediation
-            self._log_pinecone_usage(
-                "RemediationTool", 
-                "get_remediation_examples", 
-                remediation_pinecone_enabled,
-                f"Gap: comprehensive understanding, Interests: {', '.join(student_profile['interests'])}"
-            )
-
-            print(f"   ✅ Remediation generated: {remediation['remediation_id']}")
-            print(f"   🎯 Target gap: {remediation['target_gap']}")
-            print(f"   🎭 Personality applied: {personality}")
-            explanation_text = remediation.get("content", {}).get("explanation", "")
-            if explanation_text:
-                print(f"   📝 Remediation preview: {explanation_text[:150]}...")
-
-            # Step 7: Log the remediation response
-            remediation_log = {
-                "step": "remediation",
-                "remediation_id": remediation["remediation_id"],
-                "target_gap": remediation["target_gap"],
-                "personality": personality,
-                "remediation_content": remediation,
-                "llm_response_raw": remediation.get("llm_response_raw"),
-                "timestamp": datetime.utcnow().isoformat(),
-            }
+            remediation_data = remediation_response.data
+            print(f"      ✅ Remediation generated")
         else:
-            print("\n4️⃣ No remediation needed - student demonstration is sufficient! 🎉")
+            print("   3️⃣ No remediation needed!")
 
-        # Compile complete test result
+        # Compile test results
         result = {
             "scenario_name": scenario["name"],
-            "personality": personality,
-            "concept": self.test_concept,
+            "session_id": session_id,
             "student_profile": student_profile,
-            "exercise_source": (
-                "hardcoded" if self.use_hardcoded_exercise else "generated"
-            ),
-            "logs": {
-                "exercise_generation": exercise_log,
-                "evaluation": evaluation_log,
-                "remediation": remediation_log,
-            },
-            "final_data": {
-                "generated_exercise": generated_exercise,
-                "hardcoded_exercise": self.hardcoded_exercise,
-                "student_response": student_response,
-                "evaluation": evaluation,
-                "remediation": remediation,
+            "workflow_data": {
+                "exercise": exercise_data,
+                "student_response": hardcoded_response,
+                "evaluation": evaluation_data,
+                "remediation": remediation_data
             },
             "test_details": {
-                "exercise_for_personalization": "generated_exercise",
-                "exercise_for_evaluation": "hardcoded_exercise",
-                "exercise_for_remediation": "hardcoded_exercise",
-            },
-            "pinecone_usage": {
-                "generator_enabled": getattr(self.generator.pinecone_service, 'enabled', False),
-                "evaluator_enabled": getattr(self.evaluator.pinecone_service, 'enabled', False),
-                "remediation_enabled": getattr(self.remediation_gen.pinecone_service, 'enabled', False),
-                "usage_log": self.pinecone_usage_log.copy(),
+                "response_type": scenario["response_type"],
+                "remediation_requested": remediation_data is not None
             },
             "workflow_completed": True,
-            "total_steps": 4 if not evaluation["needs_remediation"] else 5,
-            "test_timestamp": datetime.utcnow().isoformat(),
+            "total_steps": 3 if not remediation_data else 4,
+            "test_timestamp": datetime.utcnow().isoformat()
         }
 
         return result
@@ -668,11 +441,6 @@ class ExerciseWorkflowTester:
     ) -> str:
         """Generate hardcoded student responses that work with any generated exercise."""
 
-        # Extract key information from the generated exercise
-        exercise.get("content", {}).get("problem", "")
-        exercise.get("content", {}).get("scenario", "")
-
-        # Generate responses that are realistic for the problem type
         if response_type == "perfect":
             return """
 Looking at this problem, I can see this is a quadratic equation that needs to be solved systematically.
@@ -776,95 +544,22 @@ Just give me the answer so I can move on to the next problem.
             return "I'm not sure how to approach this problem."
 
     async def _save_comprehensive_results(self):
-        """Save comprehensive test results to timestamped files only."""
+        """Save comprehensive test results to timestamped files."""
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
-        # Save raw JSON results (timestamped only)
-        json_file = os.path.join(
-            self.output_dir, f"workflow_test_results_{timestamp}.json"
-        )
-
+        # Save raw JSON results
+        json_file = os.path.join(self.output_dir, f"workflow_test_results_{timestamp}.json")
         with open(json_file, "w") as f:
             json.dump(self.test_results, f, indent=2, default=str)
 
-        # Save comprehensive markdown report (timestamped only)
+        # Save comprehensive markdown report
         md_file = os.path.join(self.output_dir, f"workflow_test_report_{timestamp}.md")
-
-        comprehensive_report = self._generate_comprehensive_report()
+        report = self._generate_comprehensive_report()
         with open(md_file, "w") as f:
-            f.write(comprehensive_report)
-
-    def _generate_pinecone_analysis_section(self) -> str:
-        """Generate Pinecone usage analysis section for the report."""
-        successful_results = [r for r in self.test_results if r["success"]]
-        
-        if not successful_results:
-            return "\n## 🔍 Pinecone Vector Search Analysis\n\nNo successful tests to analyze.\n\n"
-        
-        # Count Pinecone usage
-        total_tests = len(successful_results)
-        generator_enabled_count = sum(1 for r in successful_results if r["result"]["pinecone_usage"]["generator_enabled"])
-        evaluator_enabled_count = sum(1 for r in successful_results if r["result"]["pinecone_usage"]["evaluator_enabled"])
-        remediation_enabled_count = sum(1 for r in successful_results if r["result"]["pinecone_usage"]["remediation_enabled"])
-        
-        # Collect all usage logs
-        all_usage_logs = []
-        for r in successful_results:
-            all_usage_logs.extend(r["result"]["pinecone_usage"]["usage_log"])
-        
-        usage_stats = {
-            "ExerciseTool": {"used": 0, "total": 0},
-            "EvaluationTool": {"used": 0, "total": 0},
-            "RemediationTool": {"used": 0, "total": 0}
-        }
-        
-        for log in all_usage_logs:
-            component = log["component"]
-            if component in usage_stats:
-                usage_stats[component]["total"] += 1
-                if log["pinecone_used"]:
-                    usage_stats[component]["used"] += 1
-        
-        section = f"""## 🔍 Pinecone Vector Search Analysis
-
-### 📊 Service Configuration Status
-- **ExerciseTool**: {'✅ Enabled' if generator_enabled_count > 0 else '❌ Disabled'} ({generator_enabled_count}/{total_tests} tests)
-- **EvaluationTool**: {'✅ Enabled' if evaluator_enabled_count > 0 else '❌ Disabled'} ({evaluator_enabled_count}/{total_tests} tests)
-- **RemediationTool**: {'✅ Enabled' if remediation_enabled_count > 0 else '❌ Disabled'} ({remediation_enabled_count}/{total_tests} tests)
-
-### 🎯 Vector Search Usage Statistics
-"""
-        
-        for component, stats in usage_stats.items():
-            if stats["total"] > 0:
-                usage_rate = (stats["used"] / stats["total"]) * 100
-                section += f"- **{component}**: {stats['used']}/{stats['total']} operations used vector search ({usage_rate:.1f}%)\n"
-        
-        # Add configuration details
-        section += f"""
-### ⚙️ Configuration Details
-- **ENABLE_VECTOR_CONTEXT**: {os.getenv('ENABLE_VECTOR_CONTEXT', 'NOT_SET')}
-- **PINECONE_API_KEY**: {'✅ SET' if os.getenv('PINECONE_API_KEY') else '❌ NOT_SET'}
-- **CONTENT_SERVICE_SEARCH_URL**: {os.getenv('CONTENT_SERVICE_SEARCH_URL', 'NOT_SET')}
-
-### 🔍 Impact Analysis
-{"✅ **Vector Search ACTIVE**: This test demonstrates the enhanced workflow with Pinecone vector search providing context-aware content generation." if any(stats["used"] > 0 for stats in usage_stats.values()) else "⚠️ **Vector Search INACTIVE**: This test ran with fallback to standard prompts. Vector search was not utilized."}
-
-### 📋 Detailed Usage Log
-"""
-        
-        if all_usage_logs:
-            for log in all_usage_logs[-5:]:  # Show last 5 logs
-                status = "🚀 USED" if log["pinecone_used"] else "⚠️ FALLBACK"
-                section += f"- {status} {log['component']}: {log['operation']} - {log['details']}\n"
-        else:
-            section += "- No usage logs available\n"
-        
-        section += "\n"
-        return section
+            f.write(report)
 
     def _generate_comprehensive_report(self) -> str:
-        """Generate comprehensive markdown report combining structured data and human-readable analysis."""
+        """Generate a comprehensive markdown report of test results."""
         successful_results = [r for r in self.test_results if r["success"]]
 
         report = f"""# 🎯 Exercise Workflow Test - Comprehensive Report
@@ -875,20 +570,16 @@ Just give me the answer so I can move on to the next problem.
 - **Successful Tests**: {len(successful_results)} ✅
 - **Failed Tests**: {len(self.test_results) - len(successful_results)} ❌
 - **Success Rate**: {(len(successful_results) / len(self.test_results) * 100):.1f}%
-- **Exercise Source**: {"Hardcoded" if self.use_hardcoded_exercise else "Generated"}
-- **Personalities Tested**: {len(set(r.get('personality', 'unknown') for r in self.test_results))}
 - **Student Types**: {len(set(r['scenario']['name'] for r in self.test_results if r.get('scenario')))}
 
 ## 🔬 Test Methodology
 
-This test follows the **correct workflow**:
-1. **Generate Personalized Exercise** - Create exercises tailored to each student's interests (tests personalization)
-2. **Apply Hardcoded Responses** - Use consistent student responses across all tests  
-3. **Evaluate Responses** - Assess understanding using hardcoded exercise (tests evaluation accuracy)
-4. **Generate Remediation** - Create targeted help when needed (tests remediation quality)
-5. **Log Everything** - Capture all LLM interactions for analysis
-
-**CRITICAL**: The evaluator and remediation generator use the hardcoded exercise for consistent testing, while the exercise generator creates personalized exercises to test personalization capabilities.
+This test follows the ChatAgent workflow:
+1. **Generate Personalized Exercise** - Create exercises tailored to each student's interests
+2. **Submit Student Response** - Use consistent hardcoded responses across all tests
+3. **Evaluate Response** - Assess understanding through the chat interface
+4. **Generate Remediation** - Create targeted help when needed through chat
+5. **Log Everything** - Capture all interactions for analysis
 
 ## 📚 Test Subject: {self.test_concept['name']}
 
@@ -901,20 +592,13 @@ This test follows the **correct workflow**:
             report += f"{i}. {obj}\n"
 
         report += "\n## 👥 Student Profiles Tested\n\n"
-
         for scenario in self.student_scenarios:
             report += f"### {scenario['name']} 👤\n"
             report += f"- **Description**: {scenario['description']}\n"
             report += f"- **Grade Level**: {scenario['grade_level']}\n"
             report += f"- **Interests**: {', '.join(scenario['interests'])}\n"
-            report += f"- **Response Type**: {scenario['response_type']}\n\n"
-
-        personalities_tested = list(
-            set(r.get("personality", "unknown") for r in successful_results)
-        )
-        report += "## 🎭 Personalities Tested\n\n"
-        for personality in personalities_tested:
-            report += f"- {personality}\n"
+            report += f"- **Response Type**: {scenario['response_type']}\n"
+            report += f"- **Personality**: {scenario['personality_type']}\n\n"
 
         # Add performance analysis
         report += "\n## 📈 Performance Analysis\n\n"
@@ -923,230 +607,51 @@ This test follows the **correct workflow**:
         report += "### 👥 Performance by Student Type\n\n"
         for scenario in self.student_scenarios:
             scenario_results = [
-                r
-                for r in successful_results
+                r for r in successful_results
                 if r["scenario"]["name"] == scenario["name"]
             ]
             if not scenario_results:
                 continue
 
-            scores = [
-                r["result"]["final_data"]["evaluation"]["understanding_score"]
-                for r in scenario_results
-            ]
-            avg_score = sum(scores) / len(scores)
-            mastery_rate = sum(
-                1
-                for r in scenario_results
-                if r["result"]["final_data"]["evaluation"]["mastery_achieved"]
-            ) / len(scenario_results)
-            remediation_rate = sum(
-                1
-                for r in scenario_results
-                if r["result"]["final_data"]["evaluation"]["needs_remediation"]
-            ) / len(scenario_results)
-
             report += f"**{scenario['name']}**:\n"
-            report += f"- Average Understanding Score: {avg_score:.1%} ({avg_score:.2f}/1.0)\n"
-            report += f"- Mastery Achievement Rate: {mastery_rate:.1%}\n"
-            report += f"- Remediation Required Rate: {remediation_rate:.1%}\n"
-            report += f"- Tests Conducted: {len(scenario_results)} (across all personalities)\n\n"
-
-        # Performance by personality
-        report += "### 🎭 Performance by Personality\n\n"
-        for personality in personalities_tested:
-            personality_results = [
-                r for r in successful_results if r.get("personality") == personality
-            ]
-            if not personality_results:
-                continue
-
-            scores = [
-                r["result"]["final_data"]["evaluation"]["understanding_score"]
-                for r in personality_results
-            ]
-            avg_score = sum(scores) / len(scores)
-            mastery_rate = sum(
-                1
-                for r in personality_results
-                if r["result"]["final_data"]["evaluation"]["mastery_achieved"]
-            ) / len(personality_results)
-
-            report += f"**{personality}**:\n"
-            report += f"- Average Understanding Score: {avg_score:.1%} ({avg_score:.2f}/1.0)\n"
-            report += f"- Mastery Achievement Rate: {mastery_rate:.1%}\n"
-            report += f"- Tests Conducted: {len(personality_results)}\n\n"
-
-        report += "\n## 📋 Detailed Test Results\n\n"
-
-        # Group by personality for better organization
-        for personality in personalities_tested:
-            personality_results = [
-                r for r in successful_results if r.get("personality") == personality
-            ]
-            if not personality_results:
-                continue
-
-            report += f"### 🎭 {personality.upper()} Personality Results\n\n"
-
-            for test_result in personality_results:
-                scenario = test_result["scenario"]
-                result = test_result["result"]
-
-                report += f"#### 👤 {scenario['name']} Test\n\n"
-
-                # Show exercise details
-                generated_exercise = result["final_data"]["generated_exercise"]
-                hardcoded_exercise = result["final_data"]["hardcoded_exercise"]
-                
-                report += f"**🎯 Generated Exercise (Personalization Test)**:\n"
-                report += f"- **Exercise ID**: {generated_exercise['exercise_id']}\n"
-                report += f"- **Interests Applied**: {', '.join(generated_exercise['personalization']['interests_used'])}\n"
-                report += f"- **Scenario**: {generated_exercise['content']['scenario']}\n"
-                report += f"- **Problem**: {generated_exercise['content']['problem']}\n\n"
-                
-                report += f"**🔧 Hardcoded Exercise (Evaluation Test)**:\n"
-                report += f"- **Exercise ID**: {hardcoded_exercise['exercise_id']}\n"
-                report += f"- **Problem**: {hardcoded_exercise['content']['problem']}\n\n"
-
-                report += "**📝 Expected Steps (Hardcoded Exercise)**:\n"
-                for i, step in enumerate(hardcoded_exercise["content"]["expected_steps"], 1):
-                    report += f"{i}. {step}\n"
-
-                report += "\n**💡 Hints Available (Hardcoded Exercise)**:\n"
-                hints = hardcoded_exercise["content"].get("hints", [])
-                for i, hint in enumerate(hints, 1):
-                    report += f"{i}. {hint}\n"
-
-                report += f"\n**🎯 Success Criteria (Hardcoded Exercise)**: {hardcoded_exercise['content']['success_criteria']}\n\n"
-
-                # Show student response
-                student_response = result["final_data"]["student_response"]
-                report += "**🗣️ Student Response**:\n"
-                report += f"```\n{student_response.strip()}\n```\n\n"
-
-                # Show evaluation
-                evaluation = result["final_data"]["evaluation"]
-                report += "**📊 AI Evaluation**:\n"
-                report += f"- **Understanding Score**: {evaluation['understanding_score']:.1%} ({evaluation['understanding_score']:.2f}/1.0)\n"
-                report += f"- **Mastery Achieved**: {'✅ Yes' if evaluation['mastery_achieved'] else '❌ No'}\n"
-                report += f"- **Needs Remediation**: {'⚠️ Yes' if evaluation['needs_remediation'] else '✅ No'}\n"
-
-                if evaluation.get("feedback"):
-                    report += f"- **AI Feedback**: {evaluation['feedback'][:300]}...\n"
-
-                # Show LLM response for evaluation (condensed)
-                if evaluation.get("llm_response"):
-                    llm_resp = evaluation["llm_response"]
-                    if (
-                        isinstance(llm_resp, dict)
-                        and "understanding_analysis" in llm_resp
-                    ):
-                        understanding = llm_resp["understanding_analysis"]
-                        if isinstance(understanding, dict):
-                            demo = understanding.get("demonstrated_understanding", "")
-                            missing = understanding.get("missing_understanding", "")
-                            report += "\n**🔍 LLM Analysis**:\n"
-                            report += f"- **Demonstrated**: {demo[:200]}...\n"
-                            report += f"- **Missing**: {missing[:200]}...\n"
-
-                report += "\n"
-
-                # Show remediation if generated
-                if result["final_data"]["remediation"]:
-                    remediation = result["final_data"]["remediation"]
-                    report += "**🔧 Generated Remediation**:\n"
-                    report += f"- **Target Gap**: {remediation['target_gap']}\n"
-                    report += f"- **Personality Applied**: {personality}\n"
-
-                    content = remediation.get("content", {})
-                    if content.get("gap_analysis", {}).get("specific_gaps"):
-                        report += f"- **Gap Analysis**: {content['gap_analysis']['specific_gaps'][:200]}...\n"
-
-                    report += "\n"
-
-                report += "---\n\n"
-
-        # Add Pinecone usage analysis
-        report += self._generate_pinecone_analysis_section()
-
-        # Add conclusion section
-        report += """## 🎯 Key Findings
-
-This comprehensive test validates:
-
-1. **✅ Exercise Generation**: Successfully creates personalized exercises based on student interests
-2. **✅ Response Evaluation**: Accurately assesses student understanding across different response types  
-3. **✅ Remediation Generation**: Appropriately generates targeted help when needed
-4. **✅ Personality Integration**: Different personalities are applied consistently
-5. **✅ Workflow Completeness**: Full end-to-end workflow functions correctly
-6. **✅ LLM Response Capture**: All LLM interactions are logged for analysis
-
-## 🔍 What to Look For
-
-When reviewing these results, pay attention to:
-- **Score Differentiation**: Do the understanding scores properly differentiate between student types?
-- **LLM Response Quality**: Are the LLM evaluations meaningful and accurate?
-- **Personalization Quality**: Are the exercises truly personalized to student interests?
-- **Evaluation Accuracy**: Do the understanding scores match the quality of student responses?
-- **Remediation Appropriateness**: Is remediation generated when needed and skipped when not?
-- **Personality Consistency**: Are different personalities reflected in the remediation content?
-
-This test provides a comprehensive view of the exercise service's capabilities and validates that the LLMs are providing meaningful, accurate responses for educational assessment.
-"""
+            report += f"- Tests Completed Successfully: {len(scenario_results)}\n"
+            report += f"- Response Type: {scenario['response_type']}\n"
+            
+            remediation_count = sum(
+                1 for r in scenario_results
+                if r["result"]["workflow_data"]["remediation"] is not None
+            )
+            report += f"- Remediation Required: {remediation_count}/{len(scenario_results)}\n\n"
 
         return report
 
 
-async def main():
+def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="Exercise Workflow Test Suite")
-    parser.add_argument(
-        "--mode",
-        choices=["quick", "full"],
-        default="quick",
-        help="Test mode: quick (default personality only) or full (all personalities)",
+    parser = argparse.ArgumentParser(
+        description="Test complete exercise workflow with ChatAgent"
     )
     parser.add_argument(
-        "--hardcoded-exercise",
+        "--quick",
         action="store_true",
-        help="Use hardcoded exercise for consistent evaluator testing",
+        help="Run quick test with one student",
+    )
+    parser.add_argument(
+        "--base-url",
+        default="http://localhost:8000",
+        help="Base URL for the exercise service API",
     )
 
     args = parser.parse_args()
 
-    print("🚀 Exercise Workflow Test Suite - PINECONE ENHANCED Version")
-    print("=" * 60)
-    print(f"Mode: {args.mode.upper()}")
-    print(f"Exercise Source: {'Hardcoded' if args.hardcoded_exercise else 'Generated'}")
-    print("Following the ENHANCED workflow with Pinecone Vector Search:")
-    print("1. Generate personalized exercises (with vector context)")
-    print("2. Use hardcoded student responses for consistency")
-    print("3. Evaluate responses (with educational context)")
-    print("4. Generate remediation (with example content)")
-    print("5. Log all interactions including Pinecone usage")
-    print("=" * 60)
-
-    tester = None
+    # Run tests
     try:
-        tester = ExerciseWorkflowTester(use_hardcoded_exercise=args.hardcoded_exercise)
-        await tester.run_comprehensive_test(quick_mode=(args.mode == "quick"))
-        print("\n✅ Workflow test completed successfully!")
-
-    except KeyboardInterrupt:
-        print(f"\n⚠️  Test interrupted by user")
-        if tester:
-            tester._cleanup_mock_service()
-        sys.exit(1)
+        tester = ExerciseWorkflowTester(base_url=args.base_url)
+        asyncio.run(tester.run_comprehensive_test(quick_mode=args.quick))
     except Exception as e:
         print(f"\n❌ Test failed: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
-        if tester:
-            tester._cleanup_mock_service()
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
