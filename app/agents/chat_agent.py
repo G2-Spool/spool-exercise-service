@@ -86,8 +86,17 @@ class ChatAgent:
         session_state["current_evaluation"] = tool_result
         session_state["phase"] = "evaluation"
         
-        # New button structure: "Get New Exercise" and "Practice"
-        available_actions = ["get_new_exercise", "practice"]
+        # Determine available actions based on evaluation results
+        available_actions = ["get_new_exercise"]
+        
+        # Only add "practice" button if remediation is needed
+        evaluation_data = tool_result.get("evaluation", {})
+        needs_remediation = evaluation_data.get("needs_remediation", False)
+        understanding_score = evaluation_data.get("understanding_score", 1.0)
+        
+        # Show practice button if remediation is needed OR score is below 0.7
+        if needs_remediation or understanding_score < 0.7:
+            available_actions.append("practice")
             
         return {
             "message": comprehensive_feedback,
@@ -124,10 +133,11 @@ class ChatAgent:
 
         intro_message = await self._craft_intro_message(exercise_data, session_state)
 
+        # Clear previous session data and start fresh with new exercise
         session_state["current_exercise"] = exercise_data
         session_state["phase"] = "exercise"
-        # Clear previous evaluation
-        session_state.pop("current_evaluation", None)
+        session_state.pop("current_evaluation", None)  # Clear previous evaluation
+        session_state.pop("history", None)  # Clear chat history for fresh start
 
         return {
             "message": intro_message,
@@ -154,7 +164,7 @@ class ChatAgent:
         return {
             "message": remediation_message,
             "session_state": session_state,
-            "available_actions": ["get_new_exercise", "ask_question"],
+            "available_actions": ["get_new_exercise", "get_hint", "ask_question"],
             "data": tool_result,
         }
         
@@ -176,7 +186,7 @@ class ChatAgent:
         return {
             "message": remediation_message,
             "session_state": session_state,
-            "available_actions": ["get_new_exercise", "ask_question"],
+            "available_actions": ["get_new_exercise", "get_hint", "ask_question"],
             "data": tool_result,
         }
 
