@@ -14,8 +14,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.dependencies import get_redis_cache
 from app.core.database import init_database, close_database, get_database_manager
-from app.langgraph.workflows import ExerciseWorkflow
-from app.routers import exercise, evaluation, remediation, hints
+from app.routers import chat
 
 # Setup structured logging
 setup_logging()
@@ -30,7 +29,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize services
     redis_cache = await get_redis_cache()
-    workflow = ExerciseWorkflow()
     
     # Initialize database in production
     if settings.ENVIRONMENT == "production":
@@ -40,7 +38,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Store in app state
     app.state.redis_cache = redis_cache
-    app.state.workflow = workflow
 
     # Prometheus metrics are set up outside of lifespan
 
@@ -82,13 +79,8 @@ if settings.ENABLE_METRICS:
     instrumentator = Instrumentator()
     instrumentator.instrument(app).expose(app, endpoint="/metrics")
 
-# Include routers
-app.include_router(exercise.router, prefix="/api/exercise", tags=["exercise"])
-app.include_router(evaluation.router, prefix="/api/exercise", tags=["evaluation"])
-app.include_router(
-    remediation.router, prefix="/api/exercise/remediation", tags=["remediation"]
-)
-app.include_router(hints.router, prefix="/api/exercise", tags=["hints"])
+# Include the new chat router
+app.include_router(chat.router, prefix="/api", tags=["chat"])
 
 
 @app.get("/", tags=["root"])
@@ -115,20 +107,11 @@ async def health_check(request: Request) -> JSONResponse:
     # Check Redis
     try:
         if hasattr(request.app.state, "redis_cache"):
+            # A more robust check might be needed depending on the cache implementation
             await request.app.state.redis_cache.exists("health_check")
             health_status["checks"]["redis"] = "healthy"
     except Exception as e:
         health_status["checks"]["redis"] = f"unhealthy: {str(e)}"
-        health_status["status"] = "degraded"
-
-    # Check LangGraph workflow
-    try:
-        if hasattr(request.app.state, "workflow"):
-            # Simple check that workflow is initialized
-            _ = request.app.state.workflow.graph
-            health_status["checks"]["langgraph"] = "healthy"
-    except Exception as e:
-        health_status["checks"]["langgraph"] = f"unhealthy: {str(e)}"
         health_status["status"] = "degraded"
         
     # Check database (production only)
