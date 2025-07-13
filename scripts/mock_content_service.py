@@ -24,63 +24,63 @@ except ImportError:
 # Mock educational content chunks
 MOCK_CONTENT_CHUNKS = [
     {
-        "concept_id": "linear_systems_001",
-        "content": "A system of linear equations consists of two or more linear equations with the same variables. The goal is to find a common solution that satisfies all equations simultaneously. These systems are crucial for modeling real-world problems in fields like economics, engineering, and computer science.",
+        "concept_id": "probability_independent_001",
+        "content": "Independent events are events where the outcome of one event does not affect the probability of another event occurring. For example, when flipping a coin twice, the result of the first flip doesn't change the probability of getting heads or tails on the second flip. Each flip has a 1/2 probability of being heads, regardless of previous results.",
         "score": 0.95,
-        "book": "Linear Algebra Essentials",
+        "book": "Introduction to Probability",
         "subject": "Mathematics",
-        "concept_name": "Introduction to Systems of Linear Equations",
+        "concept_name": "Understanding Independent Events",
         "concept_type": "explanation",
-        "chapter_title": "Linear Systems",
+        "chapter_title": "Independent Events",
         "section_title": "Core Concepts"
     },
     {
-        "concept_id": "linear_systems_002",
-        "content": "There are three primary methods for solving systems of linear equations: substitution, elimination, and graphing. The substitution method involves solving one equation for one variable and substituting that expression into the other equation. The elimination method involves adding or subtracting the equations to eliminate one variable.",
+        "concept_id": "probability_independent_002",
+        "content": "To calculate the probability of multiple independent events all occurring, multiply their individual probabilities together. This is called the multiplication rule for independent events. If event A has probability P(A) and event B has probability P(B), then P(A and B) = P(A) × P(B). For example, the probability of rolling a 6 on a die AND flipping heads on a coin is (1/6) × (1/2) = 1/12.",
         "score": 0.92,
-        "book": "Linear Algebra Problem Solving",
+        "book": "Probability Rules and Applications",
         "subject": "Mathematics",
-        "concept_name": "Methods for Solving Linear Systems",
+        "concept_name": "Multiplication Rule for Independent Events",
         "concept_type": "explanation",
-        "chapter_title": "Solving Systems",
-        "section_title": "Substitution and Elimination"
+        "chapter_title": "Calculating Probabilities",
+        "section_title": "Multiplication Rule"
     },
     {
-        "concept_id": "linear_systems_sports_001",
-        "content": "In sports analytics, systems of linear equations are used to model team performance and player statistics. For example, you could create a system to determine how many 2-point and 3-point shots a basketball team made based on their total shots and total points.",
+        "concept_id": "probability_sports_001",
+        "content": "In sports, independent events can model situations like free throw shooting. If a basketball player has a 75% free throw percentage, each shot is independent of previous shots. The probability of making 3 consecutive free throws is 0.75 × 0.75 × 0.75 = 0.421875, or about 42.2%. This helps coaches understand streaks and performance expectations.",
         "score": 0.89,
-        "book": "Mathematics in Sports",
-        "subject": "Applied Mathematics",
-        "concept_name": "Sports Analytics with Linear Systems",
+        "book": "Statistics in Sports",
+        "subject": "Applied Probability",
+        "concept_name": "Sports Applications of Independent Events",
         "concept_type": "application",
-        "chapter_title": "Statistical Modeling",
-        "section_title": "Performance Metrics"
+        "chapter_title": "Performance Analysis",
+        "section_title": "Free Throw Probability"
     },
     {
-        "concept_id": "linear_systems_example_001",
-        "content": "Example: Solve the system: 1) x + y = 10, 2) x - y = 4. Using elimination, add the two equations: (x + y) + (x - y) = 10 + 4, which simplifies to 2x = 14, so x = 7. Substitute x = 7 into the first equation: 7 + y = 10, which gives y = 3. The solution is (7, 3).",
+        "concept_id": "probability_example_001",
+        "content": "Example: What's the probability of rolling two dice and getting a 4 on the first die AND a 6 on the second die? Since the dice rolls are independent, we multiply: P(4 on first) × P(6 on second) = (1/6) × (1/6) = 1/36 ≈ 0.0278 or about 2.78%. Each die has 6 equally likely outcomes, so each specific number has a 1/6 probability.",
         "score": 0.94,
-        "book": "Step-by-Step Linear Algebra",
+        "book": "Step-by-Step Probability",
         "subject": "Mathematics",
-        "concept_name": "Solving a Linear System by Elimination",
+        "concept_name": "Dice Rolling Example",
         "concept_type": "example",
         "chapter_title": "Worked Examples",
-        "section_title": "Elimination Method Practice"
+        "section_title": "Dice Probability"
     }
 ]
 
 # Mock remediation examples
 MOCK_REMEDIATION_EXAMPLES = [
     {
-        "concept_id": "remediation_linear_systems_001",
-        "content": "When students struggle with systems of linear equations, it's often due to calculation errors or choosing the wrong method. Encourage them to check their work by substituting the final x and y values back into both original equations. Visualizing the problem by graphing the lines can also help build intuition.",
+        "concept_id": "remediation_probability_001",
+        "content": "When students struggle with independent events, they often confuse them with dependent events or forget to multiply probabilities. Help them identify independence by asking: 'Does the first event change what can happen in the second event?' Use concrete examples like coin flips or dice rolls. Common mistakes include adding probabilities instead of multiplying them, or thinking that previous outcomes affect future ones (the gambler's fallacy).",
         "score": 0.96,
-        "book": "Teaching Linear Algebra",
+        "book": "Teaching Probability Concepts",
         "subject": "Mathematical Pedagogy",
-        "concept_name": "Teaching Strategies for Linear Systems",
+        "concept_name": "Teaching Strategies for Independent Events",
         "concept_type": "explanation",
         "chapter_title": "Common Student Difficulties",
-        "section_title": "Verification and Visualization"
+        "section_title": "Independence vs Dependence"
     }
 ]
 

@@ -53,9 +53,10 @@ class ChatAgent:
 
     async def _handle_generate_exercise(self, session_state: Dict[str, Any]) -> Dict[str, Any]:
         """Orchestrates exercise generation."""
-        concept = {"id": "linear_systems", "name": "Systems of Linear Equations", "content": "Systems of linear equations consist of multiple linear equations with the same variables that must be solved simultaneously using substitution, elimination, or graphing methods."}
+        student_profile = session_state.get("student_profile", {})
+        concept = self._get_concept_from_profile(student_profile)
         
-        tool_result = await self.exercise_tool.generate(concept, session_state.get("student_profile", {}))
+        tool_result = await self.exercise_tool.generate(concept, student_profile)
         exercise_data = tool_result.get("exercise", {})
 
         intro_message = await self._craft_intro_message(exercise_data, session_state)
@@ -126,7 +127,7 @@ class ChatAgent:
                 session_state["student_profile"] = student_profile
         
         # Generate new exercise with potentially adjusted difficulty
-        concept = {"id": "linear_systems", "name": "Systems of Linear Equations", "content": "Systems of linear equations consist of multiple linear equations with the same variables that must be solved simultaneously using substitution, elimination, or graphing methods."}
+        concept = self._get_concept_from_profile(student_profile)
         
         tool_result = await self.exercise_tool.generate(concept, student_profile)
         exercise_data = tool_result.get("exercise", {})
@@ -137,7 +138,7 @@ class ChatAgent:
         session_state["current_exercise"] = exercise_data
         session_state["phase"] = "exercise"
         session_state.pop("current_evaluation", None)  # Clear previous evaluation
-        session_state.pop("history", None)  # Clear chat history for fresh start
+        session_state.pop("history", None)
 
         return {
             "message": intro_message,
@@ -417,3 +418,32 @@ class ChatAgent:
                 "data": {"mock": True}
             }
         return self._create_error_response("Mock action not recognized.", session_state) 
+
+    def _get_concept_from_profile(self, student_profile: Dict[str, Any]) -> Dict[str, str]:
+        """Determine concept based on student profile topic."""
+        topic = student_profile.get("topic", "algebra").lower()
+        
+        if topic == "statistics":
+            return {
+                "id": "probability_independent", 
+                "name": "Probability of Independent Events", 
+                "content": "Independent events are events where the outcome of one does not affect the probability of another. To find the probability of multiple independent events occurring, multiply their individual probabilities together using the multiplication rule."
+            }
+        elif topic == "geometry":
+            return {
+                "id": "geometry_basic", 
+                "name": "Geometric Problem Solving", 
+                "content": "Geometric problems involve finding unknown measurements using properties of shapes, angles, and spatial relationships."
+            }
+        elif topic == "calculus":
+            return {
+                "id": "calculus_basic", 
+                "name": "Basic Calculus Concepts", 
+                "content": "Calculus involves the study of rates of change (derivatives) and accumulation (integrals) in mathematical functions."
+            }
+        else:  # Default to algebra or linear systems
+            return {
+                "id": "linear_systems", 
+                "name": "Systems of Linear Equations", 
+                "content": "Systems of linear equations consist of multiple linear equations with the same variables that must be solved simultaneously using substitution, elimination, or graphing methods."
+            } 

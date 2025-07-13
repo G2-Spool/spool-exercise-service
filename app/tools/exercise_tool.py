@@ -155,7 +155,70 @@ class ExerciseTool:
         difficulty = student_profile.get("difficulty", "basic")
         
         # Create appropriate mock content based on concept type
-        if "system" in concept_name.lower() or "linear" in concept_name.lower():
+        if "probability" in concept_name.lower() or "independent" in concept_name.lower():
+            # Generate probability problems based on interests
+            if "basketball" in [i.lower() for i in interests]:
+                problem = f"""A basketball player has a 75% free throw success rate. If they take 3 consecutive free throws, what is the probability that they make all 3 shots?
+
+Since each free throw is independent (previous shots don't affect future ones), multiply the probabilities:
+
+P(all 3 shots) = P(shot 1) × P(shot 2) × P(shot 3)
+P(all 3 shots) = 0.75 × 0.75 × 0.75 = ?
+
+Calculate this probability and express it as both a decimal and a percentage."""
+                scenario = f"You are analyzing {interests[0]} statistics to understand the probability of consecutive successful free throws."
+                expected_steps = [
+                    "Identify that free throws are independent events",
+                    "Apply the multiplication rule: P(A and B) = P(A) × P(B)",
+                    "Calculate: 0.75 × 0.75 × 0.75 = 0.421875",
+                    "Convert to percentage: 0.421875 × 100 = 42.1875%",
+                    "Verify the answer makes sense (less than single shot probability)"
+                ]
+                hints = [
+                    "Independent events: the outcome of one doesn't affect the others",
+                    "Multiply the individual probabilities: 0.75 × 0.75 × 0.75"
+                ]
+            elif "blackjack" in [i.lower() for i in interests]:
+                problem = f"""In {interests[0]}, what is the probability of drawing two specific cards in a row from a standard deck without replacement?
+
+First, let's modify this to be about independent events: If you draw a card, note it, then put it back and shuffle before drawing again, what's the probability of drawing a King on the first draw AND a Queen on the second draw?
+
+Since we're replacing the card, these are independent events."""
+                scenario = f"You are calculating probabilities in {interests[0]} card games with replacement (independent events)."
+                expected_steps = [
+                    "Identify that with replacement, draws are independent",
+                    "Calculate P(King on first draw) = 4/52 = 1/13",
+                    "Calculate P(Queen on second draw) = 4/52 = 1/13",
+                    "Apply multiplication rule: (1/13) × (1/13) = 1/169",
+                    "Convert to decimal: 1/169 ≈ 0.0059 or 0.59%"
+                ]
+                hints = [
+                    "With replacement, each draw is independent",
+                    "There are 4 Kings and 4 Queens in a standard 52-card deck"
+                ]
+            else:
+                problem = f"""Two coins are flipped simultaneously. What is the probability of getting heads on both coins?
+
+Since coin flips are independent events, use the multiplication rule:
+
+P(heads on coin 1) = 1/2
+P(heads on coin 2) = 1/2
+P(heads on both) = ?
+
+Calculate this probability."""
+                scenario = f"You are using probability concepts in a {interests[0]} context involving independent events."
+                expected_steps = [
+                    "Recognize that coin flips are independent events",
+                    "Identify P(heads) = 1/2 for each coin",
+                    "Apply multiplication rule: (1/2) × (1/2) = 1/4",
+                    "Convert to decimal: 1/4 = 0.25 or 25%",
+                    "Verify: this is one of four equally likely outcomes"
+                ]
+                hints = [
+                    "Each coin flip has a 50% chance of being heads",
+                    "Multiply the probabilities: (1/2) × (1/2)"
+                ]
+        elif "system" in concept_name.lower() or "linear" in concept_name.lower():
             problem = f"A {interests[0]} business problem: A movie theater sells adult tickets for $$12 each and child tickets for $$7 each. Last Saturday, they sold 150 tickets total and collected $$1,550 in revenue. How many adult tickets and child tickets were sold?\n\nSet up and solve this system of linear equations:\n$$a + c = 150$$ (total tickets)\n$$12a + 7c = 1550$$ (total revenue)\n\nWhere $$a$$ = adult tickets and $$c$$ = child tickets."
             scenario = f"You are helping a {interests[0]} business analyze their ticket sales data using systems of linear equations."
             expected_steps = [
