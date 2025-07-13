@@ -9,10 +9,24 @@ This script consolidates all basic system tests including:
 - Environment validation
 """
 
-import asyncio
 import os
 import sys
 from pathlib import Path
+
+# Add project root and app directory to Python path
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent
+app_path = project_root / "app"
+
+# Add both project root and app directory to path
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(app_path))
+
+print(f"Python path: {sys.path[0]}")
+print(f"App path: {sys.path[1]}")
+
+# Now import other dependencies
+import asyncio
 from dotenv import load_dotenv
 
 # Force reload of environment variables
@@ -185,16 +199,14 @@ class SystemTester:
         print("\n🔧 Testing Service Imports")
         print("=" * 40)
 
-        # Add app directory to path
-        app_path = Path(__file__).parent.parent / "app"
-        sys.path.insert(0, str(app_path))
+        # Path is already set up in the file header
 
         service_imports = [
             ("app.core.config", "Configuration"),
             ("app.models.exercise", "Exercise Models"),
-            ("app.generators.exercise_generator", "Exercise Generator"),
-            ("app.evaluators.response_evaluator", "Response Evaluator"),
-            ("app.remediation.remediation_generator", "Remediation Generator"),
+            ("app.tools.exercise_tool", "Exercise Tool"),
+            ("app.tools.evaluation_tool", "Evaluation Tool"),
+            ("app.tools.remediation_tool", "Remediation Tool"),
             ("app.services.pinecone_service", "Pinecone Service"),
         ]
 

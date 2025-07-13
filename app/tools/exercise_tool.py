@@ -92,9 +92,15 @@ class ExerciseTool:
         return """
         You are an expert educational content creator. Your task is to generate an educational exercise based on the provided details.
 
+        IMPORTANT: If the concept involves "Systems of Linear Equations", you MUST create a problem that requires solving multiple linear equations simultaneously (typically 2 equations with 2 variables). This is NOT a single linear equation like ax + b = c, but rather a system like:
+        - x + y = 10
+        - 2x + 3y = 24
+        
+        The student must solve both equations together using substitution, elimination, or graphing methods.
+
         Return a single JSON object with the following structure:
         - "scenario": A real-world context for the problem that uses student interests.
-        - "problem": A specific, concrete challenge with a measurable outcome.
+        - "problem": A specific, concrete challenge with a measurable outcome. For systems of linear equations, clearly present the system of equations to be solved.
         - "expected_steps": An array of 4-6 strings outlining the logical steps to solve the problem.
         - "hints": An array of 2-3 strings containing progressive hints.
         - "personalization": A brief explanation of how the exercise was personalized for the student.
@@ -147,16 +153,37 @@ class ExerciseTool:
         interests = student_profile.get("interests", ["general activities"])
         concept_name = concept.get("name", "Unknown Concept")
         difficulty = student_profile.get("difficulty", "basic")
+        
+        # Create appropriate mock content based on concept type
+        if "system" in concept_name.lower() or "linear" in concept_name.lower():
+            problem = f"A {interests[0]} business problem: A movie theater sells adult tickets for $$12 each and child tickets for $$7 each. Last Saturday, they sold 150 tickets total and collected $$1,550 in revenue. How many adult tickets and child tickets were sold?\n\nSet up and solve this system of linear equations:\n$$a + c = 150$$ (total tickets)\n$$12a + 7c = 1550$$ (total revenue)\n\nWhere $$a$$ = adult tickets and $$c$$ = child tickets."
+            scenario = f"You are helping a {interests[0]} business analyze their ticket sales data using systems of linear equations."
+            expected_steps = [
+                "Define variables: a = adult tickets, c = child tickets",
+                "Set up equation 1: a + c = 150 (total tickets)",
+                "Set up equation 2: 12a + 7c = 1550 (total revenue)",
+                "Solve using substitution or elimination method",
+                "Verify solution by substituting back into both equations"
+            ]
+            hints = [
+                "This is a system of two linear equations with two unknowns",
+                "Try using substitution: solve equation 1 for a, then substitute into equation 2"
+            ]
+        else:
+            problem = f"This is a mock {difficulty} problem about {concept_name}."
+            scenario = f"Imagine you are using {concept_name} in a project related to {interests[0]}."
+            expected_steps = ["Step 1", "Step 2", "Step 3"]
+            hints = ["Hint 1", "Hint 2"]
 
         return {
             "type": "exercise_generated",
             "exercise": {
                 "id": str(uuid.uuid4()),
                 "concept_id": concept.get("id"),
-                "problem": f"This is a mock {difficulty} problem about {concept_name}.",
-                "scenario": f"Imagine you are using {concept_name} in a project related to {interests[0]}.",
-                "expected_steps": ["Step 1", "Step 2", "Step 3"],
-                "hints": ["Hint 1", "Hint 2"],
+                "problem": problem,
+                "scenario": scenario,
+                "expected_steps": expected_steps,
+                "hints": hints,
                 "difficulty": difficulty,
                 "topic": concept_name
             },

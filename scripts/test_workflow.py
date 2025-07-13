@@ -57,14 +57,15 @@ from app.models.exercise import (
 
 try:
     from app.langgraph.workflows import ExerciseWorkflow
-
     WORKFLOW_AVAILABLE = True
-except ImportError:
+    print("✅ LangGraph workflow loaded successfully")
+except ImportError as e:
+    print(f"⚠️ LangGraph workflow not available: {str(e)}")
     WORKFLOW_AVAILABLE = False
 
-from app.generators.exercise_generator import ExerciseGenerator
-from app.evaluators.response_evaluator import ResponseEvaluator
-from app.remediation.remediation_generator import RemediationGenerator
+from app.tools.exercise_tool import ExerciseTool
+from app.tools.evaluation_tool import EvaluationTool
+from app.tools.remediation_tool import RemediationTool
 
 # Setup basic logging
 
@@ -95,9 +96,9 @@ class ExerciseWorkflowTester:
         self._setup_mock_content_service()
         
         # Initialize components after mock service is ready
-        self.generator = ExerciseGenerator()
-        self.evaluator = ResponseEvaluator()
-        self.remediation_gen = RemediationGenerator()
+        self.generator = ExerciseTool()
+        self.evaluator = EvaluationTool()
+        self.remediation_gen = RemediationTool()
         if WORKFLOW_AVAILABLE:
             self.workflow = ExerciseWorkflow()
         else:
@@ -498,7 +499,7 @@ class ExerciseWorkflowTester:
 
             # Log Pinecone usage for exercise generation
             self._log_pinecone_usage(
-                "ExerciseGenerator", 
+                "ExerciseTool", 
                 "get_concept_context", 
                 generator_pinecone_enabled,
                 f"Concept: {self.test_concept['name']}, Interests: {', '.join(student_profile['interests'])}"
@@ -553,7 +554,7 @@ class ExerciseWorkflowTester:
 
         # Log Pinecone usage for evaluation
         self._log_pinecone_usage(
-            "ResponseEvaluator", 
+            "EvaluationTool", 
             "get_concept_context", 
             evaluator_pinecone_enabled,
             f"Concept: {self.test_concept['name']}, Response length: {len(student_response)}"
@@ -597,7 +598,7 @@ class ExerciseWorkflowTester:
 
             # Log Pinecone usage for remediation
             self._log_pinecone_usage(
-                "RemediationGenerator", 
+                "RemediationTool", 
                 "get_remediation_examples", 
                 remediation_pinecone_enabled,
                 f"Gap: comprehensive understanding, Interests: {', '.join(student_profile['interests'])}"
@@ -812,9 +813,9 @@ Just give me the answer so I can move on to the next problem.
             all_usage_logs.extend(r["result"]["pinecone_usage"]["usage_log"])
         
         usage_stats = {
-            "ExerciseGenerator": {"used": 0, "total": 0},
-            "ResponseEvaluator": {"used": 0, "total": 0},
-            "RemediationGenerator": {"used": 0, "total": 0}
+            "ExerciseTool": {"used": 0, "total": 0},
+            "EvaluationTool": {"used": 0, "total": 0},
+            "RemediationTool": {"used": 0, "total": 0}
         }
         
         for log in all_usage_logs:
@@ -827,9 +828,9 @@ Just give me the answer so I can move on to the next problem.
         section = f"""## 🔍 Pinecone Vector Search Analysis
 
 ### 📊 Service Configuration Status
-- **ExerciseGenerator**: {'✅ Enabled' if generator_enabled_count > 0 else '❌ Disabled'} ({generator_enabled_count}/{total_tests} tests)
-- **ResponseEvaluator**: {'✅ Enabled' if evaluator_enabled_count > 0 else '❌ Disabled'} ({evaluator_enabled_count}/{total_tests} tests)
-- **RemediationGenerator**: {'✅ Enabled' if remediation_enabled_count > 0 else '❌ Disabled'} ({remediation_enabled_count}/{total_tests} tests)
+- **ExerciseTool**: {'✅ Enabled' if generator_enabled_count > 0 else '❌ Disabled'} ({generator_enabled_count}/{total_tests} tests)
+- **EvaluationTool**: {'✅ Enabled' if evaluator_enabled_count > 0 else '❌ Disabled'} ({evaluator_enabled_count}/{total_tests} tests)
+- **RemediationTool**: {'✅ Enabled' if remediation_enabled_count > 0 else '❌ Disabled'} ({remediation_enabled_count}/{total_tests} tests)
 
 ### 🎯 Vector Search Usage Statistics
 """
