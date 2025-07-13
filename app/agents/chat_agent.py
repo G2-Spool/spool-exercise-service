@@ -42,6 +42,10 @@ class ChatAgent:
             return await self._handle_generate_exercise(session_state)
         elif action == "submit_answer":
             return await self._handle_evaluate_response(message, session_state)
+        elif action == "get_new_exercise":
+            return await self._handle_get_new_exercise(session_state)
+        elif action == "practice":
+            return await self._handle_practice(session_state)
         elif action == "request_remediation":
             return await self._handle_request_remediation(session_state)
         else:
@@ -67,7 +71,7 @@ class ChatAgent:
         }
 
     async def _handle_evaluate_response(self, student_response: str, session_state: Dict[str, Any]) -> Dict[str, Any]:
-        """Orchestrates response evaluation."""
+        """Orchestrates response evaluation with comprehensive results presentation."""
         exercise = session_state.get("current_exercise")
         if not exercise:
             return self._create_error_response("No active exercise found in session.", session_state)
@@ -76,19 +80,81 @@ class ChatAgent:
 
         tool_result = await self.evaluation_tool.evaluate(exercise, student_response, concept)
         
-        feedback_message = await self._craft_feedback_message(tool_result, session_state)
+        # Present comprehensive evaluation results
+        comprehensive_feedback = await self._craft_comprehensive_feedback_message(tool_result, session_state)
 
         session_state["current_evaluation"] = tool_result
         session_state["phase"] = "evaluation"
         
-        available_actions = ["new_exercise", "continue_chat"]
-        if tool_result.get("evaluation", {}).get("needs_remediation"):
-            available_actions.insert(0, "request_remediation")
+        # New button structure: "Get New Exercise" and "Practice"
+        available_actions = ["get_new_exercise", "practice"]
             
         return {
-            "message": feedback_message,
+            "message": comprehensive_feedback,
             "session_state": session_state,
             "available_actions": available_actions,
+            "data": tool_result,
+        }
+
+    async def _handle_get_new_exercise(self, session_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle getting a new exercise, adjusting difficulty if needed."""
+        evaluation = session_state.get("current_evaluation")
+        student_profile = session_state.get("student_profile", {}).copy()
+        
+        # Check if score is 3/10 or lower (0.3 or lower) and adjust difficulty
+        if evaluation:
+            understanding_score = evaluation.get("evaluation", {}).get("understanding_score", 0.0)
+            if understanding_score <= 0.3:
+                # Lower the difficulty level
+                current_difficulty = student_profile.get("difficulty", "basic")
+                if current_difficulty == "advanced":
+                    student_profile["difficulty"] = "intermediate"
+                elif current_difficulty == "intermediate":
+                    student_profile["difficulty"] = "basic"
+                # If already at basic, keep it at basic
+                
+                # Update the session state with adjusted difficulty
+                session_state["student_profile"] = student_profile
+        
+        # Generate new exercise with potentially adjusted difficulty
+        concept = {"id": "linear_systems", "name": "Systems of Linear Equations", "content": "Systems of linear equations consist of multiple linear equations with the same variables that must be solved simultaneously using substitution, elimination, or graphing methods."}
+        
+        tool_result = await self.exercise_tool.generate(concept, student_profile)
+        exercise_data = tool_result.get("exercise", {})
+
+        intro_message = await self._craft_intro_message(exercise_data, session_state)
+
+        session_state["current_exercise"] = exercise_data
+        session_state["phase"] = "exercise"
+        # Clear previous evaluation
+        session_state.pop("current_evaluation", None)
+
+        return {
+            "message": intro_message,
+            "session_state": session_state,
+            "available_actions": ["submit_answer", "get_hint", "ask_question"],
+            "data": tool_result,
+        }
+
+    async def _handle_practice(self, session_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle practice button - requests remediation and walks through it."""
+        evaluation = session_state.get("current_evaluation")
+        exercise = session_state.get("current_exercise")
+        if not evaluation or not exercise:
+            return self._create_error_response("No evaluation found to generate practice session.", session_state)
+
+        concept = {"id": exercise.get("concept_id"), "name": exercise.get("topic")}
+        
+        tool_result = await self.remediation_tool.generate(evaluation, exercise, concept, session_state.get("student_profile", {}))
+        
+        remediation_message = await self._craft_remediation_message(tool_result, session_state)
+        
+        session_state["phase"] = "remediation"
+        
+        return {
+            "message": remediation_message,
+            "session_state": session_state,
+            "available_actions": ["get_new_exercise", "ask_question"],
             "data": tool_result,
         }
         
@@ -110,7 +176,7 @@ class ChatAgent:
         return {
             "message": remediation_message,
             "session_state": session_state,
-            "available_actions": ["new_exercise", "ask_question"],
+            "available_actions": ["get_new_exercise", "ask_question"],
             "data": tool_result,
         }
 
@@ -263,20 +329,23 @@ class ChatAgent:
         )
         return response.choices[0].message.content or "Let's get started on your new exercise!"
 
-    async def _craft_feedback_message(self, eval_data: Dict[str, Any], session_state: Dict[str, Any]) -> str:
-        """Uses an LLM to craft personality-driven feedback."""
+    async def _craft_comprehensive_feedback_message(self, eval_data: Dict[str, Any], session_state: Dict[str, Any]) -> str:
+        """Uses an LLM to craft a personality-driven comprehensive feedback message."""
         personality_prompt = personality_loader.get_personality_prompt(session_state.get("personality_type"))
         analysis = eval_data.get("analysis", {})
         prompt = f"""
         You are an AI tutor with the following personality: {personality_prompt}
-        You just evaluated your student's response. Here is the analysis:
+        You just evaluated your student's response. Here is the comprehensive analysis:
         - Strengths: {', '.join(analysis.get('strengths',[]))}
         - Weaknesses: {', '.join(analysis.get('weaknesses',[]))}
         - Detailed Feedback: {analysis.get('detailed_feedback')}
+        - Understanding Score: {eval_data.get('evaluation', {}).get('understanding_score', 'N/A')}
+        - Correctness Score: {eval_data.get('evaluation', {}).get('correctness_score', 'N/A')}
+        - Overall Score: {eval_data.get('evaluation', {}).get('overall_score', 'N/A')}
 
         Your task:
-        1. Deliver this feedback to the student based on your personality.
-        2. Be encouraging, even if the score is low. Focus on growth and next steps.
+        1. Present this comprehensive feedback to the student based on your personality.
+        2. Emphasize the positive aspects and areas for improvement.
         3. Do NOT invent a name or any other details for the student.
         4. **Crucially, any mathematical equations, variables, or expressions in your response MUST be enclosed in double dollar signs for LaTeX rendering. Example: $$y = mx + b$$**
         """
@@ -284,7 +353,7 @@ class ChatAgent:
             model=settings.GENERATION_MODEL,
             messages=[{"role": "system", "content": "You are a conversational AI Tutor."}, {"role": "user", "content": prompt}]
         )
-        return response.choices[0].message.content or "Here's some feedback on your work."
+        return response.choices[0].message.content or "Here's a comprehensive look at your work."
 
     async def _craft_remediation_message(self, rem_data: Dict[str, Any], session_state: Dict[str, Any]) -> str:
         """Uses an LLM to craft a personality-driven remediation message."""
